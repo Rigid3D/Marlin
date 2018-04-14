@@ -36,8 +36,12 @@
 #endif
 #undef en
 
+#ifndef CHARSIZE
+  #define CHARSIZE 1
+#endif
+
 #ifndef WELCOME_MSG
-  #define WELCOME_MSG                         MACHINE_NAME _UxGT(" ready.")
+  #define WELCOME_MSG                         MACHINE_NAME _UxGT(" Ready.")
 #endif
 #ifndef MSG_BACK
   #define MSG_BACK                            _UxGT("Back")
@@ -50,6 +54,9 @@
 #endif
 #ifndef MSG_LCD_ENDSTOPS
   #define MSG_LCD_ENDSTOPS                    _UxGT("Endstops") // Max length 8 characters
+#endif
+#ifndef MSG_LCD_SOFT_ENDSTOPS
+  #define MSG_LCD_SOFT_ENDSTOPS               _UxGT("Soft Endstops")
 #endif
 #ifndef MSG_MAIN
   #define MSG_MAIN                            _UxGT("Main")
@@ -174,7 +181,6 @@
 #ifndef MSG_USER_MENU
   #define MSG_USER_MENU                       _UxGT("Custom Commands")
 #endif
-
 #ifndef MSG_UBL_DOING_G29
   #define MSG_UBL_DOING_G29                   _UxGT("Doing G29")
 #endif
@@ -375,31 +381,31 @@
   #define MSG_LED_PRESETS                     _UxGT("Light Presets")
 #endif
 #ifndef MSG_SET_LEDS_RED
-  #define MSG_SET_LEDS_RED                    _UxGT("Lights Red")
+  #define MSG_SET_LEDS_RED                    _UxGT("Red")
 #endif
 #ifndef MSG_SET_LEDS_ORANGE
-  #define MSG_SET_LEDS_ORANGE                 _UxGT("Lights Orange")
+  #define MSG_SET_LEDS_ORANGE                 _UxGT("Orange")
 #endif
 #ifndef MSG_SET_LEDS_YELLOW
-  #define MSG_SET_LEDS_YELLOW                 _UxGT("Lights Yellow")
+  #define MSG_SET_LEDS_YELLOW                 _UxGT("Yellow")
 #endif
 #ifndef MSG_SET_LEDS_GREEN
-  #define MSG_SET_LEDS_GREEN                  _UxGT("Lights Green")
+  #define MSG_SET_LEDS_GREEN                  _UxGT("Green")
 #endif
 #ifndef MSG_SET_LEDS_BLUE
-  #define MSG_SET_LEDS_BLUE                   _UxGT("Lights Blue")
+  #define MSG_SET_LEDS_BLUE                   _UxGT("Blue")
 #endif
 #ifndef MSG_SET_LEDS_INDIGO
-  #define MSG_SET_LEDS_INDIGO                 _UxGT("Lights Indigo")
+  #define MSG_SET_LEDS_INDIGO                 _UxGT("Indigo")
 #endif
 #ifndef MSG_SET_LEDS_VIOLET
-  #define MSG_SET_LEDS_VIOLET                 _UxGT("Lights Violet")
+  #define MSG_SET_LEDS_VIOLET                 _UxGT("Violet")
 #endif
 #ifndef MSG_SET_LEDS_WHITE
-  #define MSG_SET_LEDS_WHITE                  _UxGT("Lights White")
+  #define MSG_SET_LEDS_WHITE                  _UxGT("White")
 #endif
 #ifndef MSG_SET_LEDS_DEFAULT
-  #define MSG_SET_LEDS_DEFAULT                _UxGT("Lights Default")
+  #define MSG_SET_LEDS_DEFAULT                _UxGT("Default")
 #endif
 #ifndef MSG_CUSTOM_LEDS
   #define MSG_CUSTOM_LEDS                     _UxGT("Custom Lights")
@@ -510,14 +516,26 @@
 #ifndef MSG_JERK
   #define MSG_JERK                            _UxGT("Jerk")
 #endif
-#ifndef MSG_VX_JERK
-  #define MSG_VX_JERK                         _UxGT("Vx-jerk")
-#endif
-#ifndef MSG_VY_JERK
-  #define MSG_VY_JERK                         _UxGT("Vy-jerk")
-#endif
-#ifndef MSG_VZ_JERK
-  #define MSG_VZ_JERK                         _UxGT("Vz-jerk")
+#if IS_KINEMATIC
+  #ifndef MSG_VA_JERK
+    #define MSG_VA_JERK                       _UxGT("Va-jerk")
+  #endif
+  #ifndef MSG_VB_JERK
+    #define MSG_VB_JERK                       _UxGT("Vb-jerk")
+  #endif
+  #ifndef MSG_VC_JERK
+    #define MSG_VC_JERK                       _UxGT("Vc-jerk")
+  #endif
+#else
+  #ifndef MSG_VA_JERK
+    #define MSG_VA_JERK                       _UxGT("Vx-jerk")
+  #endif
+  #ifndef MSG_VB_JERK
+    #define MSG_VB_JERK                       _UxGT("Vy-jerk")
+  #endif
+  #ifndef MSG_VC_JERK
+    #define MSG_VC_JERK                       _UxGT("Vz-jerk")
+  #endif
 #endif
 #ifndef MSG_VE_JERK
   #define MSG_VE_JERK                         _UxGT("Ve-jerk")
@@ -549,14 +567,26 @@
 #ifndef MSG_STEPS_PER_MM
   #define MSG_STEPS_PER_MM                    _UxGT("Steps/mm")
 #endif
-#ifndef MSG_XSTEPS
-  #define MSG_XSTEPS                          _UxGT("Xsteps/mm")
-#endif
-#ifndef MSG_YSTEPS
-  #define MSG_YSTEPS                          _UxGT("Ysteps/mm")
-#endif
-#ifndef MSG_ZSTEPS
-  #define MSG_ZSTEPS                          _UxGT("Zsteps/mm")
+#if IS_KINEMATIC
+  #ifndef MSG_ASTEPS
+    #define MSG_ASTEPS                        _UxGT("Asteps/mm")
+  #endif
+  #ifndef MSG_BSTEPS
+    #define MSG_BSTEPS                        _UxGT("Bsteps/mm")
+  #endif
+  #ifndef MSG_CSTEPS
+    #define MSG_CSTEPS                        _UxGT("Csteps/mm")
+  #endif
+#else
+  #ifndef MSG_ASTEPS
+    #define MSG_ASTEPS                        _UxGT("Xsteps/mm")
+  #endif
+  #ifndef MSG_BSTEPS
+    #define MSG_BSTEPS                        _UxGT("Ysteps/mm")
+  #endif
+  #ifndef MSG_CSTEPS
+    #define MSG_CSTEPS                        _UxGT("Zsteps/mm")
+  #endif
 #endif
 #ifndef MSG_ESTEPS
   #define MSG_ESTEPS                          _UxGT("Esteps/mm")
@@ -756,11 +786,17 @@
 #ifndef MSG_HEATING_FAILED_LCD
   #define MSG_HEATING_FAILED_LCD              _UxGT("Heating failed")
 #endif
+#ifndef MSG_HEATING_FAILED_LCD_BED
+  #define MSG_HEATING_FAILED_LCD_BED          _UxGT("Bed heating failed")
+#endif
 #ifndef MSG_ERR_REDUNDANT_TEMP
   #define MSG_ERR_REDUNDANT_TEMP              _UxGT("Err: REDUNDANT TEMP")
 #endif
 #ifndef MSG_THERMAL_RUNAWAY
   #define MSG_THERMAL_RUNAWAY                 _UxGT("THERMAL RUNAWAY")
+#endif
+#ifndef MSG_THERMAL_RUNAWAY_BED
+  #define MSG_THERMAL_RUNAWAY_BED             _UxGT("BED THERMAL RUNAWAY")
 #endif
 #ifndef MSG_ERR_MAXTEMP
   #define MSG_ERR_MAXTEMP                     _UxGT("Err: MAXTEMP")
@@ -775,7 +811,7 @@
   #define MSG_ERR_MINTEMP_BED                 _UxGT("Err: MINTEMP BED")
 #endif
 #ifndef MSG_ERR_Z_HOMING
-  #define MSG_ERR_Z_HOMING                    _UxGT("G28 Z Forbidden")
+  #define MSG_ERR_Z_HOMING                    MSG_HOME _UxGT(" ") MSG_X MSG_Y _UxGT(" ") MSG_FIRST
 #endif
 #ifndef MSG_HALTED
   #define MSG_HALTED                          _UxGT("PRINTER HALTED")
@@ -798,8 +834,17 @@
 #ifndef MSG_HEATING_COMPLETE
   #define MSG_HEATING_COMPLETE                _UxGT("Heating done.")
 #endif
+#ifndef MSG_COOLING
+  #define MSG_COOLING                         _UxGT("Cooling...")
+#endif
+#ifndef MSG_COOLING_COMPLETE
+  #define MSG_COOLING_COMPLETE                _UxGT("Cooling done.")
+#endif
 #ifndef MSG_BED_HEATING
-  #define MSG_BED_HEATING                     _UxGT("Bed Heating.")
+  #define MSG_BED_HEATING                     _UxGT("Bed heating.")
+#endif
+#ifndef MSG_BED_COOLING
+  #define MSG_BED_COOLING                     _UxGT("Bed cooling.")
 #endif
 #ifndef MSG_BED_DONE
   #define MSG_BED_DONE                        _UxGT("Bed done.")
@@ -827,6 +872,9 @@
 #endif
 #ifndef MSG_DELTA_HEIGHT_CALIBRATE
   #define MSG_DELTA_HEIGHT_CALIBRATE          _UxGT("Set Delta Height")
+#endif
+#ifndef MSG_DELTA_Z_OFFSET_CALIBRATE
+  #define MSG_DELTA_Z_OFFSET_CALIBRATE        _UxGT("Probe Z-offset")
 #endif
 #ifndef MSG_DELTA_DIAG_ROD
   #define MSG_DELTA_DIAG_ROD                  _UxGT("Diag Rod")
@@ -915,7 +963,6 @@
     #define MSG_INFO_PRINT_FILAMENT           _UxGT("Extruded")
   #endif
 #endif
-
 #ifndef MSG_INFO_MIN_TEMP
   #define MSG_INFO_MIN_TEMP                   _UxGT("Min Temp")
 #endif
@@ -960,6 +1007,9 @@
 #endif
 #ifndef MSG_ERR_PROBING_FAILED
   #define MSG_ERR_PROBING_FAILED              _UxGT("Probing failed")
+#endif
+#ifndef MSG_M600_TOO_COLD
+  #define MSG_M600_TOO_COLD                   _UxGT("M600: Too cold")
 #endif
 
 //
