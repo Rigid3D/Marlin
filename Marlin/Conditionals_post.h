@@ -38,7 +38,7 @@
   #define X_MAX_LENGTH (X_MAX_POS - (X_MIN_POS))
   #define Y_MAX_LENGTH (Y_MAX_POS - (Y_MIN_POS))
   #define Z_MAX_LENGTH (Z_MAX_POS - (Z_MIN_POS))
-
+  
   // Defined only if the sanity-check is bypassed
   #ifndef X_BED_SIZE
     #define X_BED_SIZE X_MAX_LENGTH
@@ -706,6 +706,7 @@
   // Sensors
   #define HAS_FILAMENT_WIDTH_SENSOR (PIN_EXISTS(FILWIDTH))
   #define HAS_FIL_RUNOUT (PIN_EXISTS(FIL_RUNOUT))
+  #define HAS_POWER_FAILURE (PIN_EXISTS(POWER_FAILURE))
 
   // User Interface
   #define HAS_HOME (PIN_EXISTS(HOME))
@@ -1148,3 +1149,4 @@
   #endif
 
 #endif // CONDITIONALS_POST_H
+

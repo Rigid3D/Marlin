@@ -396,6 +396,8 @@ void report_current_position();
   #define STOW_PROBE()
 #endif
 
+extern float zmax_pos_calc;
+
 #if ENABLED(HOST_KEEPALIVE_FEATURE)
   extern MarlinBusyState busy_state;
   #define KEEPALIVE_STATE(n) do{ busy_state = n; }while(0)
@@ -540,3 +542,4 @@ void do_blocking_move_to_xy(const float &x, const float &y, const float &fr_mm_s
 #endif // CARTESIAN
 
 #endif // MARLIN_H
+

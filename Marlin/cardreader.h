@@ -55,6 +55,11 @@ public:
   void stopSDPrint();
   void getStatus();
   void printingHasFinished();
+  
+  void openFile_PF();
+  void removeFile_PF();
+  void write_command_PF(char *buf);
+  void closefile_PF();
 
   #if ENABLED(LONG_FILENAME_HOST_SUPPORT)
     void printLongPath(char *path);
@@ -87,8 +92,10 @@ public:
   FORCE_INLINE bool eof() { return sdpos >= filesize; }
   FORCE_INLINE int16_t get() { sdpos = file.curPosition(); return (int16_t)file.read(); }
   FORCE_INLINE void setIndex(long index) { sdpos = index; file.seekSet(index); }
+  FORCE_INLINE uint32_t getIndex() { return file.curPosition(); }
   FORCE_INLINE uint8_t percentDone() { return (isFileOpen() && filesize) ? sdpos / ((filesize + 99) / 100) : 0; }
   FORCE_INLINE char* getWorkDirName() { workDir.getFilename(filename); return filename; }
+  FORCE_INLINE char* getfilenamepf() {file.getFilename(filename); return filename; }
 
 public:
   bool saving, logging, sdprinting, cardOK, filenameIsDir;
@@ -151,6 +158,8 @@ private:
   Sd2Card card;
   SdVolume volume;
   SdFile file;
+  
+  SdFile file_pf;
 
   #define SD_PROCEDURE_DEPTH 1
   #define MAXPATHNAMELENGTH (FILENAME_LENGTH*MAX_DIR_DEPTH + MAX_DIR_DEPTH + 1)
@@ -196,3 +205,4 @@ extern CardReader card;
 #endif
 
 #endif // _CARDREADER_H_
+

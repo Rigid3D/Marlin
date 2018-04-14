@@ -440,6 +440,27 @@ void CardReader::openFile(char* name, const bool read, const bool subcall/*=fals
   }
 }
 
+void CardReader::openFile_PF() {
+
+  if (!cardOK) return;
+
+  curDir = &root;
+  char temp[]= "R3DKAYIT.gco";
+  char *fname = temp;
+
+ //write
+    if (!file_pf.open(curDir, fname, O_CREAT | O_APPEND | O_WRITE | O_TRUNC)) {
+      SERIAL_PROTOCOLPAIR(MSG_SD_OPEN_FILE_FAIL, fname);
+      SERIAL_PROTOCOLCHAR('.');
+      SERIAL_EOL();
+    }
+    else {
+//      saving = true;
+      SERIAL_PROTOCOLLNPAIR(MSG_SD_WRITE_TO_FILE, fname);
+      lcd_setstatus(fname);
+    }
+}
+
 void CardReader::removeFile(const char * const name) {
   if (!cardOK) return;
 
@@ -495,6 +516,30 @@ void CardReader::removeFile(const char * const name) {
   }
 }
 
+void CardReader::removeFile_PF() {
+  if (!cardOK) return;
+
+//  stopSDPrint();
+
+  SdFile myDir;
+  curDir = &root;
+  const char *fname ="R3DKAYIT.gco";
+
+  if (file.remove(curDir, fname)) {
+    SERIAL_PROTOCOLPGM("File deleted:");
+    SERIAL_PROTOCOLLN(fname);
+    sdpos = 0;
+    #if ENABLED(SDCARD_SORT_ALPHA)
+      presort();
+    #endif
+  }
+  else {
+    SERIAL_PROTOCOLPGM("Deletion failed, File: ");
+    SERIAL_PROTOCOL(fname);
+    SERIAL_PROTOCOLCHAR('.');
+  }
+}
+
 void CardReader::getStatus() {
   if (cardOK) {
     SERIAL_PROTOCOLPGM(MSG_SD_PRINTING_BYTE);
@@ -524,6 +569,27 @@ void CardReader::write_command(char *buf) {
     SERIAL_ERROR_START();
     SERIAL_ERRORLNPGM(MSG_SD_ERR_WRITE_TO_FILE);
   }
+}
+
+void CardReader::write_command_PF(char *buf) {
+  char* begin = buf;
+  char* npos = 0;
+  char* end = buf + strlen(buf) - 1;
+  file_pf.writeError = false;
+  if ((npos = strchr(buf, 'N')) != NULL) {
+    begin = strchr(npos, ' ') + 1;
+    end = strchr(npos, '*') - 1;
+  }
+  end[1] = '\r';
+  end[2] = '\n';
+  end[3] = '\0';
+  file_pf.write(begin);
+  if (file_pf.writeError) {
+    SERIAL_ERROR_START();
+    SERIAL_ERRORLNPGM(MSG_SD_ERR_WRITE_TO_FILE);
+  } else {
+            SERIAL_PROTOCOLPGM("Command written to file.");
+            }
 }
 
 void CardReader::checkautostart(bool force) {
@@ -568,6 +634,12 @@ void CardReader::closefile(bool store_location) {
     //future: store printer state, filename and position for continuing a stopped print
     // so one can unplug the printer and continue printing the next day.
   }
+}
+
+void CardReader::closefile_PF() {
+  file_pf.sync();
+  file_pf.close();
+//  saving = logging = false;
 }
 
 /**
@@ -908,3 +980,4 @@ void CardReader::printingHasFinished() {
 }
 
 #endif // SDSUPPORT
+

@@ -71,10 +71,10 @@
 //
 #define X_MIN_PIN           3
 #ifndef X_MAX_PIN
-  #define X_MAX_PIN         2
+  #define X_MAX_PIN         -1 // 2
 #endif
 #define Y_MIN_PIN          14
-#define Y_MAX_PIN          15
+#define Y_MAX_PIN          -1 //15
 #define Z_MIN_PIN          18
 #define Z_MAX_PIN          19
 
@@ -252,7 +252,12 @@
 #endif
 
 // define digital pin 4 for the filament runout sensor. Use the RAMPS 1.4 digital input 4 on the servos connector
-#define FIL_RUNOUT_PIN      4
+#define FIL_RUNOUT_PIN      7
+
+#ifdef POWER_FAILURE_FEATURE
+  #define POWER_FAILURE_PIN     2
+  #define BATTERY_CONTROL_PIN  15
+#endif
 
 #ifndef PS_ON_PIN
   #define PS_ON_PIN        12
@@ -284,7 +289,7 @@
 #endif
 
 //
-// Průša i3 MK2 Multiplexer Support
+// PrÅ¯Å¡a i3 MK2 Multiplexer Support
 //
 #ifndef E_MUX0_PIN
   #define E_MUX0_PIN 40   // Z_CS_PIN
@@ -546,3 +551,4 @@
   #define BTN_ENC            -1
   // pin 29 N/C
 #endif // ZONESTAR_LCD
+

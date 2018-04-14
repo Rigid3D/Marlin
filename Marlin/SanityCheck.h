@@ -403,6 +403,19 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
 #endif
 
 /**
+ * Power Failure needs a pin, SD Support and Zmax Endstop
+ */
+#if ENABLED(POWER_FAILURE_FEATURE)
+  #if !HAS_POWER_FAILURE
+    #error "POWER_FAILURE_FEATURE requires POWER_FAILURE_PIN."
+  #elif DISABLED(SDSUPPORT)
+    #error "POWER_FAILURE_FEATURE requires SDSUPPORT."
+  #elif DISABLED(USE_ZMAX_PLUG)
+    #error "Zmax endstop is required for POWER_FAILURE_FEATURE.");
+  #endif
+#endif
+
+/**
  * Advanced Pause
  */
 #if ENABLED(ADVANCED_PAUSE_FEATURE)
@@ -450,7 +463,7 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
 #endif
 
 /**
- * Sanity checking for the Průša MK2 Multiplexer
+ * Sanity checking for the PrÅ¯Å¡a MK2 Multiplexer
  */
 #ifdef SNMM
   #error "SNMM is now MK2_MULTIPLEXER. Please update your configuration."
@@ -1612,3 +1625,4 @@ static_assert(COUNT(sanity_arr_3) <= XYZE_N, "DEFAULT_MAX_ACCELERATION has too m
 #endif
 
 #endif // _SANITYCHECK_H_
+

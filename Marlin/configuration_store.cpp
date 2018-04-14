@@ -36,7 +36,7 @@
  *
  */
 
-#define EEPROM_VERSION "V47"
+#define EEPROM_VERSION "V48"
 
 // Change EEPROM version if these are changed:
 #define EEPROM_OFFSET 100
@@ -174,9 +174,12 @@
  *  714  M852 I    planner.xy_skew_factor           (float)
  *  718  M852 J    planner.xz_skew_factor           (float)
  *  722  M852 K    planner.yz_skew_factor           (float)
+ *  
+ * MEASURED ZMAX POSITION                           4 bytes
+ *  726            zmax_pos_calc                    (float)
  *
- *  726                                   Minimum end-point
- * 2255 (726 + 208 + 36 + 9 + 288 + 988)  Maximum end-point
+ *  730                                   Minimum end-point
+ * 2259 (730 + 208 + 36 + 9 + 288 + 988)  Maximum end-point
  *
  * ========================================================================
  * meshes_begin (between max and min end-point, directly above)
@@ -724,6 +727,8 @@ void MarlinSettings::postprocess() {
       dummy = 0.0f;
       for (uint8_t q = 3; q--;) EEPROM_WRITE(dummy);
     #endif
+    
+    EEPROM_WRITE(zmax_pos_calc);
 
     if (!eeprom_error) {
       const int eeprom_size = eeprom_index;
@@ -1206,6 +1211,8 @@ void MarlinSettings::postprocess() {
       #else
         for (uint8_t q = 3; q--;) EEPROM_READ(dummy);
       #endif
+      
+      EEPROM_READ(zmax_pos_calc);
 
       if (working_crc == stored_crc) {
         postprocess();
@@ -1611,6 +1618,8 @@ void MarlinSettings::reset() {
       planner.yz_skew_factor = YZ_SKEW_FACTOR;
     #endif
   #endif
+  
+  zmax_pos_calc=Z_MAX_POS;
 
   postprocess();
 
@@ -2155,6 +2164,17 @@ void MarlinSettings::reset() {
       SERIAL_ECHOPAIR(" E", stepper.motor_current_setting[2]);
       SERIAL_EOL();
     #endif
+    
+    #if HAS_Z_MAX
+      CONFIG_ECHO_START; 
+      if (!forReplay) {
+        SERIAL_ECHOLNPGM("Measured Zmax:");  
+        CONFIG_ECHO_START;
+      }         
+      SERIAL_ECHOPAIR(" M821 ", zmax_pos_calc);
+      SERIAL_EOL();
+    #endif
   }
 
 #endif // !DISABLE_M503
+
