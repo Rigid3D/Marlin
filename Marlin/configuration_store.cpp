@@ -36,7 +36,7 @@
  *
  */
 
-#define EEPROM_VERSION "V48"
+#define EEPROM_VERSION "V49"
 
 // Change EEPROM version if these are changed:
 #define EEPROM_OFFSET 100
@@ -177,9 +177,13 @@
  *  
  * MEASURED ZMAX POSITION                           4 bytes
  *  726            zmax_pos_calc                    (float)
+ *  
+ * TOOLCHANGE EXTRUDER
+ *  730  M823 ??   toolhead_parking_x               (float x 2)
+ *  738  M823 ??   toolhead_parking_y               (float x 2)
  *
- *  730                                   Minimum end-point
- * 2259 (730 + 208 + 36 + 9 + 288 + 988)  Maximum end-point
+ *  746                                   Minimum end-point
+ * 2279 (738 + 208 + 36 + 9 + 288 + 988 + 12)  Maximum end-point
  *
  * ========================================================================
  * meshes_begin (between max and min end-point, directly above)
@@ -729,6 +733,11 @@ void MarlinSettings::postprocess() {
     #endif
     
     EEPROM_WRITE(zmax_pos_calc);
+ 
+    #if ENABLED(TOOLCHANGE_EXTRUDER) || ENABLED(PARKING_EXTRUDER)   
+      HOTEND_LOOP() EEPROM_WRITE(toolhead_parking_x[e]);
+      HOTEND_LOOP() EEPROM_WRITE(toolhead_parking_y[e]);
+    #endif
 
     if (!eeprom_error) {
       const int eeprom_size = eeprom_index;
@@ -1213,6 +1222,11 @@ void MarlinSettings::postprocess() {
       #endif
       
       EEPROM_READ(zmax_pos_calc);
+      
+    #if ENABLED(TOOLCHANGE_EXTRUDER) || ENABLED(PARKING_EXTRUDER)   
+      HOTEND_LOOP() EEPROM_READ(toolhead_parking_x[e]);
+      HOTEND_LOOP() EEPROM_READ(toolhead_parking_y[e]);
+    #endif      
 
       if (working_crc == stored_crc) {
         postprocess();
@@ -1620,6 +1634,17 @@ void MarlinSettings::reset() {
   #endif
   
   zmax_pos_calc=Z_MAX_POS;
+  
+  #if ENABLED(TOOLCHANGE_EXTRUDER) || ENABLED(PARKING_EXTRUDER)   
+      constexpr float tmpTCEX[HOTENDS] = PARKING_EXTRUDER_PARKING_X;
+      constexpr float tmpTCEY[HOTENDS] = PARKING_EXTRUDER_PARKING_Y;
+      
+      HOTEND_LOOP()
+        {
+         toolhead_parking_x[e]=tmpTCEX[e];
+         toolhead_parking_y[e]=tmpTCEY[e];
+         }
+  #endif
 
   postprocess();
 
@@ -1825,7 +1850,7 @@ void MarlinSettings::reset() {
         SERIAL_ECHOPAIR("  M218 T", (int)e);
         SERIAL_ECHOPAIR(" X", LINEAR_UNIT(hotend_offset[X_AXIS][e]));
         SERIAL_ECHOPAIR(" Y", LINEAR_UNIT(hotend_offset[Y_AXIS][e]));
-        #if ENABLED(DUAL_X_CARRIAGE) || ENABLED(SWITCHING_NOZZLE) ||ENABLED(PARKING_EXTRUDER)
+        #if ENABLED(DUAL_X_CARRIAGE) || ENABLED(SWITCHING_NOZZLE) || ENABLED(PARKING_EXTRUDER) || ENABLED(TOOLCHANGE_EXTRUDER)
           SERIAL_ECHOPAIR(" Z", LINEAR_UNIT(hotend_offset[Z_AXIS][e]));
         #endif
         SERIAL_EOL();
@@ -2171,8 +2196,22 @@ void MarlinSettings::reset() {
         SERIAL_ECHOLNPGM("Measured Zmax:");  
         CONFIG_ECHO_START;
       }         
-      SERIAL_ECHOPAIR(" M821 ", zmax_pos_calc);
+      SERIAL_ECHOPAIR(" M821 ", LINEAR_UNIT(zmax_pos_calc));
       SERIAL_EOL();
+    #endif
+    
+    #if ENABLED(TOOLCHANGE_EXTRUDER) || ENABLED(PARKING_EXTRUDER)       
+      if (!forReplay) {
+        CONFIG_ECHO_START;
+        SERIAL_ECHOLNPGM("Toolhead Parking X Positions:");
+      }
+      CONFIG_ECHO_START;
+      HOTEND_LOOP() {
+        SERIAL_ECHOPAIR("  M823 T", (int)e);
+        SERIAL_ECHOPAIR(" X ", LINEAR_UNIT(toolhead_parking_x[e]));
+        SERIAL_ECHOPAIR(" Y ", LINEAR_UNIT(toolhead_parking_y[e]));
+        SERIAL_EOL();
+      }    
     #endif
   }
 

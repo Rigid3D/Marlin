@@ -3622,6 +3622,27 @@ void kill_screen(const char* lcd_msg) {
     END_MENU();
   }
 
+  // TOOLCHANGE  
+  
+#if ENABLED(TOOLCHANGE_EXTRUDER) || ENABLED(PARKING_EXTRUDER)
+  void lcd_control_toolchange() {
+    START_MENU();
+    MENU_BACK(MSG_MOTION);  
+  
+    MENU_ITEM_EDIT(float43, MSG_TOOLOFFSETX, &hotend_offset[X_AXIS][1], -50, 50);
+    MENU_ITEM_EDIT(float43, MSG_TOOLOFFSETY, &hotend_offset[Y_AXIS][1], -50, 50);
+    MENU_ITEM_EDIT(float43, MSG_TOOLOFFSETZ, &hotend_offset[Z_AXIS][1], -10, 10);
+    
+    MENU_ITEM_EDIT(float43, MSG_TOOLPARKPOSX_1, &toolhead_parking_x[0], 0, 200);
+    MENU_ITEM_EDIT(float43, MSG_TOOLPARKPOSY_1, &toolhead_parking_y[0], 0, 200);
+    MENU_ITEM_EDIT(float43, MSG_TOOLPARKPOSX_2, &toolhead_parking_x[1], 0, 200);
+    MENU_ITEM_EDIT(float43, MSG_TOOLPARKPOSY_2, &toolhead_parking_y[1], 0, 200);
+  
+    END_MENU();  
+  }
+#endif  
+
+
   void lcd_control_motion_menu() {
     START_MENU();
     MENU_BACK(MSG_CONTROL);
@@ -3643,6 +3664,11 @@ void kill_screen(const char* lcd_msg) {
 
     // M92 - Steps Per mm
     MENU_ITEM(submenu, MSG_STEPS_PER_MM, lcd_control_motion_steps_per_mm_menu);
+    
+    // Toolchange
+#if ENABLED(TOOLCHANGE_EXTRUDER) || ENABLED(PARKING_EXTRUDER)
+    MENU_ITEM(submenu, MSG_TC_MENU, lcd_control_toolchange);
+#endif
 
     // M540 S - Abort on endstop hit when SD printing
     #if ENABLED(ABORT_ON_ENDSTOP_HIT_FEATURE_ENABLED)

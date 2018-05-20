@@ -207,6 +207,7 @@
  * M605 - Set dual x-carriage movement mode: "M605 S<mode> [X<x_offset>] [R<temp_offset>]". (Requires DUAL_X_CARRIAGE)
  * M821 - Measure and Save Zmax position
  * M822 - Stop printing and save remaining print job to SD
+ * M823 - Set toolhead parking coordinates (in linear units) "M823 T<index> X<coordinate> Y<coordinate>". (Requires toolchange or parking extruders)
  * M851 - Set Z probe's Z offset in current units. (Negative = below the nozzle.)
  * M852 - Set skew factors: "M852 [I<xy>] [J<xz>] [K<yz>]". (Requires SKEW_CORRECTION_GCODE, and SKEW_CORRECTION_FOR_Z for IJ)
  * M860 - Report the position of position encoder modules.
@@ -565,6 +566,11 @@ uint8_t target_extruder;
   float hotend_offset[XYZ][HOTENDS];  // Initialized by settings.load()
 #endif
 
+#if ENABLED(TOOLCHANGE_EXTRUDER) || ENABLED(PARKING_EXTRUDER)
+  float toolhead_parking_x[HOTENDS];   // Initialized by settings.load()
+  float toolhead_parking_y[HOTENDS];   // Initialized by settings.load()
+#endif
+
 #if HAS_Z_SERVO_ENDSTOP
   const int z_servo_angle[2] = Z_SERVO_ANGLES;
 #endif
@@ -656,6 +662,10 @@ float cartes[XYZ] = { 0 };
 #if (HAS_Z_MAX && HAS_Z_MIN) //ENABLED(POWER_FAILURE_FEATURE)
   static bool power_failure_switch = false;
   void handle_power_failure();
+#endif
+
+#if ENABLED(TOOLCHANGE_EXTRUDER)
+  static bool toolchange_running = false;
 #endif
 
 #if ENABLED(ADVANCED_PAUSE_FEATURE)
@@ -929,6 +939,22 @@ void setup_killpin() {
     SET_OUTPUT(BATTERY_CONTROL_PIN);
     WRITE(BATTERY_CONTROL_PIN, LOW);
      
+  }
+#endif
+
+#if ENABLED(TOOLCHANGE_EXTRUDER)
+
+  void setup_toolchangepin() {
+    #if ENABLED(TCE_T0_ENDSTOP_PULLUP)
+      SET_INPUT_PULLUP(TCE_T0_PIN);
+    #else
+      SET_INPUT(TCE_T0_PIN);
+    #endif
+    #if ENABLED(TCE_T1_ENDSTOP_PULLUP)
+      SET_INPUT_PULLUP(TCE_T1_PIN);
+    #else
+      SET_INPUT(TCE_T1_PIN);
+    #endif   
   }
 #endif
 
@@ -4231,7 +4257,7 @@ inline void gcode_G28(const bool always_home_all) {
 
   // Restore the active tool after homing
   #if HOTENDS > 1
-    #if ENABLED(PARKING_EXTRUDER)
+    #if (ENABLED(PARKING_EXTRUDER) || ENABLED(TOOLCHANGE_EXTRUDER))
       #define NO_FETCH false // fetch the previous toolhead
     #else
       #define NO_FETCH true
@@ -9173,7 +9199,7 @@ inline void gcode_M211() {
     if (parser.seenval('X')) hotend_offset[X_AXIS][target_extruder] = parser.value_linear_units();
     if (parser.seenval('Y')) hotend_offset[Y_AXIS][target_extruder] = parser.value_linear_units();
 
-    #if ENABLED(DUAL_X_CARRIAGE) || ENABLED(SWITCHING_NOZZLE) || ENABLED(PARKING_EXTRUDER)
+    #if ENABLED(DUAL_X_CARRIAGE) || ENABLED(SWITCHING_NOZZLE) || ENABLED(PARKING_EXTRUDER) || ENABLED(TOOLCHANGE_EXTRUDER)
       if (parser.seenval('Z')) hotend_offset[Z_AXIS][target_extruder] = parser.value_linear_units();
     #endif
 
@@ -9184,7 +9210,7 @@ inline void gcode_M211() {
       SERIAL_ECHO(hotend_offset[X_AXIS][e]);
       SERIAL_CHAR(',');
       SERIAL_ECHO(hotend_offset[Y_AXIS][e]);
-      #if ENABLED(DUAL_X_CARRIAGE) || ENABLED(SWITCHING_NOZZLE) || ENABLED(PARKING_EXTRUDER)
+      #if ENABLED(DUAL_X_CARRIAGE) || ENABLED(SWITCHING_NOZZLE) || ENABLED(PARKING_EXTRUDER) || ENABLED(TOOLCHANGE_EXTRUDER)
         SERIAL_CHAR(',');
         SERIAL_ECHO(hotend_offset[Z_AXIS][e]);
       #endif
@@ -9193,6 +9219,31 @@ inline void gcode_M211() {
   }
 
 #endif // HOTENDS > 1
+
+#if (ENABLED(TOOLCHANGE_EXTRUDER) || ENABLED(PARKING_EXTRUDER))         
+  /**
+   * M823 - set toolhead parking coordinates (in linear units)
+   *
+   *   T<tool>
+   *   X<xcoordinate>
+   *   Y<ycoordinate>
+   */
+  inline void gcode_M823() {
+    if (get_target_extruder_from_command(823)) return;
+
+    if (parser.seenval('X')) toolhead_parking_x[target_extruder] = parser.value_linear_units();
+    if (parser.seenval('Y')) toolhead_parking_y[target_extruder] = parser.value_linear_units();
+
+    SERIAL_ECHO_START();
+    SERIAL_ECHOLNPGM("Toolhead Parking Coordinates:");
+     HOTEND_LOOP() {
+        SERIAL_ECHOPAIR("  M823 T", (int)e);
+        SERIAL_ECHOPAIR(" X ", toolhead_parking_x[e]);
+        SERIAL_ECHOPAIR(" Y ", toolhead_parking_y[e]);
+        SERIAL_EOL();
+      }    
+  } 
+#endif // Toolchange extruder 
 
 /**
  * M220: Set speed percentage factor, aka "Feed Rate" (M220 S95)
@@ -11283,6 +11334,10 @@ inline void invalid_extruder_error(const uint8_t e) {
  * previous tool out of the way and the new tool into place.
  */
 void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool no_move/*=false*/) {
+
+  #if ENABLED(TOOLCHANGE_EXTRUDER)
+    toolchange_running = true;
+  #endif
   #if ENABLED(MIXING_EXTRUDER) && MIXING_VIRTUAL_TOOLS > 1
 
     if (tmp_extruder >= MIXING_VIRTUAL_TOOLS)
@@ -11302,8 +11357,9 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
       const float old_feedrate_mm_s = fr_mm_s > 0.0 ? fr_mm_s : feedrate_mm_s;
 
       feedrate_mm_s = fr_mm_s > 0.0 ? fr_mm_s : XY_PROBE_FEEDRATE_MM_S;
-
-      if (tmp_extruder != active_extruder) {
+     #if !ENABLED(TOOLCHANGE_EXTRUDER)
+      if (tmp_extruder != active_extruder)  {
+     #endif 
         if (!no_move && axis_unhomed_error()) {
           no_move = true;
           #if ENABLED(DEBUG_LEVELING_FEATURE)
@@ -11420,6 +11476,141 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
           // No extra case for HAS_ABL in DUAL_X_CARRIAGE. Does that mean they don't work together?
 
         #else // !DUAL_X_CARRIAGE
+
+          #if ENABLED(TOOLCHANGE_EXTRUDER) // Toolchange extruder
+            const float z_diff = hotend_offset[Z_AXIS][active_extruder] - hotend_offset[Z_AXIS][tmp_extruder];
+            float z_raise = PARKING_EXTRUDER_SECURITY_RAISE;
+            if (!no_move) {
+
+//              const float parkingposx[] = toolhead_parking_x,
+//                          parkingposy[] = toolhead_parking_y;
+              
+              /**
+               *  Steps:
+               *    1. Raise Z-Axis to give enough clearance
+               *    2. Move to park position X-22,0 of old extruder TCE_DISENGAGE_FEEDRATE 40 
+               *    3. X-22,Y ye git TCE_DISENGAGE_FEEDRATE
+               *    4. X,Y ye git TCE_ENGAGE_FEEDRATE
+               *    5. X,0 a git TCE_DISENGAGE_FEEDRATE
+               *    6. YeniX,0 a git TCE_DISENGAGE_FEEDRATE
+               *    7. YeniX, YeniY git TCE_ENGAGE_FEEDRATE
+               *    8. YeniX-22, YeniY git TCE_DISENGAGE_FEEDRATE
+               *    9. YeniX-22, 0 git TCE_DISENGAGE_FEEDRATE
+               *    10. Move to parking incl. offset of new extruder
+               *    11. Lower Z-Axis
+               */               
+
+              // STEP 1
+              #if ENABLED(DEBUG_LEVELING_FEATURE)
+                SERIAL_ECHOLNPGM("Starting Toolchange");
+                if (DEBUGGING(LEVELING)) DEBUG_POS("current position:", current_position);
+              #endif
+              current_position[Z_AXIS] += z_raise;
+              #if ENABLED(DEBUG_LEVELING_FEATURE)
+                SERIAL_ECHOLNPGM("(1) Raise Z-Axis ");
+                if (DEBUGGING(LEVELING)) DEBUG_POS("Moving to Raised Z-Position", current_position);
+              #endif
+              planner.buffer_line_kinematic(current_position, planner.max_feedrate_mm_s[Z_AXIS], active_extruder);
+              stepper.synchronize();
+
+           if (((active_extruder==0) && (READ(TCE_T0_PIN) != TCE_T0_ENDSTOP_INVERTING)) || ((active_extruder==1) && (READ(TCE_T1_PIN) != TCE_T1_ENDSTOP_INVERTING)))
+//             if (((active_extruder==0) && (READ(TCE_T0_PIN)^TCE_T0_ENDSTOP_INVERTING)) || ((active_extruder==1) && (READ(TCE_T1_PIN)^TCE_T1_ENDSTOP_INVERTING)))
+             {
+
+              // STEP 2
+              current_position[X_AXIS] = toolhead_parking_x[active_extruder] - TCE_PARK_LENGTH;
+              current_position[Y_AXIS] = 0;
+              #if ENABLED(DEBUG_LEVELING_FEATURE)
+                SERIAL_ECHOLNPAIR("(2) Park extruder ", active_extruder);
+                if (DEBUGGING(LEVELING)) DEBUG_POS("Moving ParkPos", current_position);
+              #endif
+              planner.buffer_line_kinematic(current_position, TCE_DISENGAGE_FEEDRATE, active_extruder);
+              stepper.synchronize();
+
+              // STEP 3       
+              current_position[Y_AXIS] = toolhead_parking_y[active_extruder];
+              #if ENABLED(DEBUG_LEVELING_FEATURE)
+                SERIAL_ECHOLNPAIR("(3) Park extruder ", active_extruder);
+                if (DEBUGGING(LEVELING)) DEBUG_POS("Moving ParkPos", current_position);
+              #endif
+              planner.buffer_line_kinematic(current_position, TCE_DISENGAGE_FEEDRATE, active_extruder);
+              stepper.synchronize();
+              
+              // STEP 4
+              current_position[X_AXIS] += TCE_PARK_LENGTH; 
+              #if ENABLED(DEBUG_LEVELING_FEATURE)
+                SERIAL_ECHOLNPAIR("(4) Park extruder ", active_extruder);
+                if (DEBUGGING(LEVELING)) DEBUG_POS("Moving ParkPos", current_position);
+              #endif
+              planner.buffer_line_kinematic(current_position, TCE_ENGAGE_FEEDRATE, active_extruder);
+              stepper.synchronize();              
+              
+              // STEP 5
+              current_position[Y_AXIS] = 0;
+              #if ENABLED(DEBUG_LEVELING_FEATURE)
+                SERIAL_ECHOLNPAIR("(5) Park extruder ", active_extruder);
+                if (DEBUGGING(LEVELING)) DEBUG_POS("Moving ParkPos", current_position);
+              #endif
+              planner.buffer_line_kinematic(current_position, TCE_DISENGAGE_FEEDRATE, active_extruder);
+              stepper.synchronize();     
+              }
+
+           if ((READ(TCE_T0_PIN) == TCE_T0_ENDSTOP_INVERTING) && (READ(TCE_T1_PIN) == TCE_T1_ENDSTOP_INVERTING))
+             {
+              // STEP 6
+              current_position[X_AXIS] = toolhead_parking_x[tmp_extruder];
+              current_position[Y_AXIS] = 0;
+              #if ENABLED(DEBUG_LEVELING_FEATURE)
+                SERIAL_ECHOLNPAIR("(6) Park extruder ", active_extruder);
+                if (DEBUGGING(LEVELING)) DEBUG_POS("Moving ParkPos", current_position);
+              #endif
+              planner.buffer_line_kinematic(current_position, TCE_DISENGAGE_FEEDRATE, active_extruder);
+              stepper.synchronize();   
+              
+              // STEP 7
+              current_position[Y_AXIS] = toolhead_parking_y[tmp_extruder];
+              #if ENABLED(DEBUG_LEVELING_FEATURE)
+                SERIAL_ECHOLNPAIR("(7) Park extruder ", active_extruder);
+                if (DEBUGGING(LEVELING)) DEBUG_POS("Moving ParkPos", current_position);
+              #endif
+              planner.buffer_line_kinematic(current_position, TCE_ENGAGE_FEEDRATE, active_extruder);
+              stepper.synchronize(); 
+              
+              // STEP 8
+              current_position[X_AXIS] -= TCE_PARK_LENGTH;
+              #if ENABLED(DEBUG_LEVELING_FEATURE)
+                SERIAL_ECHOLNPAIR("(8) Park extruder ", active_extruder);
+                if (DEBUGGING(LEVELING)) DEBUG_POS("Moving ParkPos", current_position);
+              #endif
+              planner.buffer_line_kinematic(current_position, TCE_DISENGAGE_FEEDRATE, active_extruder);
+              stepper.synchronize();               
+              
+              // STEP 9
+              current_position[Y_AXIS] = 0;
+              #if ENABLED(DEBUG_LEVELING_FEATURE)
+                SERIAL_ECHOLNPAIR("(8) Park extruder ", active_extruder);
+                if (DEBUGGING(LEVELING)) DEBUG_POS("Moving ParkPos", current_position);
+              #endif
+              planner.buffer_line_kinematic(current_position, TCE_DISENGAGE_FEEDRATE, active_extruder);
+              stepper.synchronize();   
+              #if ENABLED(DEBUG_LEVELING_FEATURE)
+                SERIAL_ECHOLNPGM("Autopark done.");
+              #endif
+            }} /*
+            else { // nomove == true
+              // Only engage magnetic field for new extruder
+              pe_activate_magnet(tmp_extruder);
+              #if ENABLED(PARKING_EXTRUDER_SOLENOIDS_INVERT)
+                pe_activate_magnet(active_extruder); // Just save power for inverted magnets
+              #endif
+            } */
+            current_position[Z_AXIS] += (hotend_offset[Z_AXIS][tmp_extruder] - hotend_offset[Z_AXIS][active_extruder]); // Apply Zoffset
+
+            #if ENABLED(DEBUG_LEVELING_FEATURE)
+              if (DEBUGGING(LEVELING)) DEBUG_POS("Applying Z-offset", current_position);
+            #endif
+
+          #endif // Toolchange extruder
 
           #if ENABLED(PARKING_EXTRUDER) // Dual Parking extruder
             const float z_diff = hotend_offset[Z_AXIS][active_extruder] - hotend_offset[Z_AXIS][tmp_extruder];
@@ -11539,7 +11730,7 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
             current_position[Z_AXIS] += z_raise;
             planner.buffer_line_kinematic(current_position, planner.max_feedrate_mm_s[Z_AXIS], active_extruder);
             move_nozzle_servo(tmp_extruder);
-          #endif
+          #endif    //SWITCHING_NOZZLE
 
           /**
            * Set current_position to the position of the new nozzle.
@@ -11662,8 +11853,9 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
             do_blocking_move_to_z(destination[Z_AXIS], planner.max_feedrate_mm_s[Z_AXIS]);
           }
         #endif
+      #if !ENABLED(TOOLCHANGE_EXTRUDER)
       } // (tmp_extruder != active_extruder)
-
+      #endif
       stepper.synchronize();
 
       #if ENABLED(EXT_SOLENOID) && !ENABLED(PARKING_EXTRUDER)
@@ -11703,6 +11895,10 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
     SERIAL_ECHOLNPAIR(MSG_ACTIVE_EXTRUDER, (int)active_extruder);
 
   #endif // !MIXING_EXTRUDER || MIXING_VIRTUAL_TOOLS <= 1
+
+  #if ENABLED(TOOLCHANGE_EXTRUDER)
+    toolchange_running = false;
+  #endif
 }
 
 /**
@@ -11728,12 +11924,19 @@ inline void gcode_T(const uint8_t tmp_extruder) {
 
   #elif HOTENDS > 1
 
+    #if ENABLED(TOOLCHANGE_EXTRUDER)
+       tool_change(
+      tmp_extruder,
+      MMM_TO_MMS(parser.linearval('F')), parser.boolval('S')
+    );
+    
+    #else
     tool_change(
       tmp_extruder,
       MMM_TO_MMS(parser.linearval('F')),
       (tmp_extruder == active_extruder) || parser.boolval('S')
     );
-
+    #endif
   #endif
 
   #if ENABLED(DEBUG_LEVELING_FEATURE)
@@ -12432,7 +12635,13 @@ void process_parsed_command() {
         case 822: // M822: Stop printing and save remaining print job to SD
           gcode_M822();
           break;
-      #endif
+      #endif 
+      
+      #if (ENABLED(TOOLCHANGE_EXTRUDER) || ENABLED(PARKING_EXTRUDER))   
+        case 823: // M823: set toolhead parking coordinates (in linear units)
+          gcode_M823();
+          break;
+      #endif // Toolchange extruder 
 
       #if HAS_BED_PROBE
         case 851: // M851: Set Z Probe Z Offset
@@ -13949,7 +14158,7 @@ void prepare_move_to_destination() {
 
       HOTEND_LOOP(){failure_commands+="T"+String(e)+"\r\nM109 S"+String(thermalManager.degTargetHotend(e))+"\r\n";}
       
-      failure_commands+="G28 W\r\nG28 X Y\r\nM420 S1\r\nM106 S"+String(fanSpeeds[0])+"\r\n";
+      failure_commands+="G28 W\r\nG28 X Y\r\nM420 S1\r\nM106 S"+String(fanSpeeds[0])+"\r\nT"+String(active_extruder)+"\r\n";
 
       thermalManager.disable_all_heaters();        
       stepper.synchronize();      
@@ -14023,9 +14232,10 @@ void prepare_move_to_destination() {
 //      do_blocking_move_to_xy(190, 190, NOZZLE_PARK_XY_FEEDRATE);
 //      stepper.synchronize();
       
-      destination[X_AXIS]=195;
-      destination[Y_AXIS]=195;
+      destination[X_AXIS]= X_MAX_POS - 5;
+      destination[Y_AXIS]= Y_MAX_POS - 5;
       destination[Z_AXIS]=current_position[Z_AXIS]+3;
+      
       prepare_move_to_destination();
       stepper.synchronize();       
 
@@ -14303,12 +14513,15 @@ void disable_all_steppers() {
 void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
 
   #if ENABLED(FILAMENT_RUNOUT_SENSOR)
-    if ((IS_SD_PRINTING || print_job_timer.isRunning()) && (READ(FIL_RUNOUT_PIN) == FIL_RUNOUT_INVERTING))
-      handle_filament_runout();
+    static int frCount = 0;   // make the inactivity button a bit less responsive
+    const int FR_DELAY = 750;
+    if ((IS_SD_PRINTING || print_job_timer.isRunning()) && (READ(FIL_RUNOUT_PIN) == FIL_RUNOUT_INVERTING)) frCount++;
+      else if (tcCount > 0) frCount--; 
+    if (frCount >= FR_DELAY)  handle_filament_runout();
   #endif
   
   #if ENABLED(POWER_FAILURE_FEATURE)
-    if (((READ(POWER_FAILURE_PIN) != POWER_FAILURE_INVERTING)) && (!power_failure_switch))
+    if (((READ(POWER_FAILURE_PIN) != POWER_FAILURE_INVERTING)) && (!power_failure_switch)) 
       {
        if (IS_SD_PRINTING) 
           {
@@ -14328,6 +14541,39 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
                       if (thermalManager.degHotend(0)<50) WRITE(BATTERY_CONTROL_PIN, HIGH);
                  }
       }             
+  #endif
+  
+  #if ENABLED(TOOLCHANGE_EXTRUDER)
+  
+    static int tcCount = 0;   // make the inactivity button a bit less responsive
+    const int TC_DELAY = 750;
+    if (((READ(TCE_T0_PIN) == TCE_T0_ENDSTOP_INVERTING) && (READ(TCE_T1_PIN) == TCE_T1_ENDSTOP_INVERTING) && !toolchange_running) || 
+        ((READ(TCE_T0_PIN) != TCE_T0_ENDSTOP_INVERTING) && (READ(TCE_T1_PIN) != TCE_T1_ENDSTOP_INVERTING)))  tcCount++;
+      else if (tcCount > 0) tcCount--;    
+    if (tcCount >= TC_DELAY) {
+        HOTEND_LOOP() if (thermalManager.target_temperature[HOTEND_INDEX]) kill(PSTR(MSG_TOOLHEAD_ERROR));
+    }                                
+    if (!toolchange_running) 
+       {
+       if ((READ(TCE_T0_PIN) != TCE_T0_ENDSTOP_INVERTING) && (READ(TCE_T1_PIN) == TCE_T1_ENDSTOP_INVERTING) && active_extruder==1) 
+         {
+         active_extruder=0;
+         current_position[Z_AXIS] += (hotend_offset[Z_AXIS][0] - hotend_offset[Z_AXIS][1]);
+         // Tell the planner the new "current position"
+         SYNC_PLAN_POSITION_KINEMATIC();         
+         lcd_setstatusPGM(PSTR(MSG_TOOLHEAD_CHANGE0), 1); 
+         lcd_return_to_status();
+         }
+       if ((READ(TCE_T0_PIN) == TCE_T0_ENDSTOP_INVERTING) && (READ(TCE_T1_PIN) != TCE_T1_ENDSTOP_INVERTING) && active_extruder==0) 
+         {
+         active_extruder=1;
+         current_position[Z_AXIS] += (hotend_offset[Z_AXIS][1] - hotend_offset[Z_AXIS][0]);
+         // Tell the planner the new "current position"
+         SYNC_PLAN_POSITION_KINEMATIC();         
+         lcd_setstatusPGM(PSTR(MSG_TOOLHEAD_CHANGE1), 1); 
+         lcd_return_to_status();
+         }
+       }  
   #endif
 
   if (commands_in_queue < BUFSIZE) get_available_commands();
@@ -14636,7 +14882,11 @@ void setup() {
   #if ENABLED(POWER_FAILURE_FEATURE)
     setup_powerfailurepin();
   #endif 
-
+  
+  #if ENABLED(TOOLCHANGE_EXTRUDER)
+    setup_toolchangepin();
+  #endif
+  
   setup_killpin();
 
   setup_powerhold();

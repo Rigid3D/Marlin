@@ -58,7 +58,7 @@
 #ifdef IS_RAMPS_13
   #define SERVO0_PIN        7 // RAMPS_13 // Will conflict with BTN_EN2 on LCD_I2C_VIKI
 #else
-  #define SERVO0_PIN       11
+  #define SERVO0_PIN       -1 //11
 #endif
 #define SERVO1_PIN          6
 #define SERVO2_PIN          5
@@ -74,7 +74,7 @@
   #define X_MAX_PIN         -1 // 2
 #endif
 #define Y_MIN_PIN          14
-#define Y_MAX_PIN          -1 //15
+#define Y_MAX_PIN          15 //15
 #define Z_MIN_PIN          18
 #define Z_MAX_PIN          19
 
@@ -251,16 +251,31 @@
   #define FILWIDTH_PIN      5   // Analog Input on AUX2
 #endif
 
-// define digital pin 4 for the filament runout sensor. Use the RAMPS 1.4 digital input 4 on the servos connector
-#define FIL_RUNOUT_PIN      7
+#if !PIN_EXISTS(FIL_RUNOUT)
+  // define digital pin 4 for the filament runout sensor. Use the RAMPS 1.4 digital input 4 on the servos connector
+//  #define FIL_RUNOUT_PIN      7
+#endif
 
 #ifdef POWER_FAILURE_FEATURE
-  #define POWER_FAILURE_PIN     2
-  #define BATTERY_CONTROL_PIN  15
+  #if !PIN_EXISTS(POWER_FAILURE)
+    #define POWER_FAILURE_PIN     2
+  #endif
+  #if !PIN_EXISTS(BATTERY_CONTROL)
+    #define BATTERY_CONTROL_PIN  15
+  #endif
+#endif
+
+#ifdef TOOLCHANGE_EXTRUDER
+  #if !PIN_EXISTS(TCE_T0)
+    #define TCE_T0_PIN  11     //A11=D65
+  #endif
+  #if !PIN_EXISTS(TCE_T1)
+    #define TCE_T1_PIN  12     //A12=D66
+  #endif
 #endif
 
 #ifndef PS_ON_PIN
-  #define PS_ON_PIN        12
+  #define PS_ON_PIN        -1 //12
 #endif
 
 #if ENABLED(CASE_LIGHT_ENABLE) && !PIN_EXISTS(CASE_LIGHT) && !defined(SPINDLE_LASER_ENABLE_PIN)

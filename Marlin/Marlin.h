@@ -398,6 +398,12 @@ void report_current_position();
 
 extern float zmax_pos_calc;
 
+// TOOLCHANGE_EXTRUDER    PARKING_EXTRUDER      Park Positions
+#if ENABLED(TOOLCHANGE_EXTRUDER) || ENABLED(PARKING_EXTRUDER)
+  extern float toolhead_parking_x[HOTENDS];
+  extern float toolhead_parking_y[HOTENDS];
+#endif
+
 #if ENABLED(HOST_KEEPALIVE_FEATURE)
   extern MarlinBusyState busy_state;
   #define KEEPALIVE_STATE(n) do{ busy_state = n; }while(0)

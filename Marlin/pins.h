@@ -103,6 +103,8 @@
   #include "pins_BAM_DICE_DUE.h"      // ATmega1280, ATmega2560
 #elif MB(MKS_BASE)
   #include "pins_MKS_BASE.h"          // ATmega1280, ATmega2560
+#elif MB(MKS_BASE2)
+  #include "pins_MKS_BASE2.h"          // ATmega1280, ATmega2560
 #elif MB(MKS_13)
   #include "pins_MKS_13.h"            // ATmega1280, ATmega2560
 #elif MB(MKS_GEN_L)
