@@ -29,7 +29,7 @@
 
 #if ENABLED(SPI_EEPROM)
 
-#include "HAL.h"
+#include HAL_PATH(., HAL.h)
 
 #define CMD_WREN  6   // WREN
 #define CMD_READ  2   // WRITE
@@ -52,7 +52,6 @@ uint8_t eeprom_read_byte(uint8_t* pos) {
   WRITE(SPI_EEPROM1_CS, HIGH);
   return v;
 }
-
 
 void eeprom_read_block(void* dest, const void* eeprom_address, size_t n) {
   uint8_t eeprom_temp[3];

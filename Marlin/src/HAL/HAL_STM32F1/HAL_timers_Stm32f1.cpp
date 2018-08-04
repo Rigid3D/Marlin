@@ -30,7 +30,7 @@
 // Includes
 // --------------------------------------------------------------------------
 
-#include "../HAL.h"
+#include "HAL.h"
 
 #include "HAL_timers_Stm32f1.h"
 
@@ -93,7 +93,7 @@ const tTimerConfig TimerConfig [NUM_HARDWARE_TIMERS] = {
  * TODO: Calculate Timer prescale value, so we get the 32bit to adjust
  */
 
-void HAL_timer_start(uint8_t timer_num, uint32_t frequency) {
+void HAL_timer_start(const uint8_t timer_num, const uint32_t frequency) {
   nvic_irq_num irq_num;
   switch (timer_num) {
     case 1: irq_num = NVIC_TIMER1_CC; break;
@@ -109,7 +109,11 @@ void HAL_timer_start(uint8_t timer_num, uint32_t frequency) {
        */
       break;
   }
-  nvic_irq_set_priority(irq_num, 0xF); // this is the lowest settable priority, but should still be over USB
+
+  /**
+   * Give the Stepper ISR a higher priority (lower number)
+   * so it automatically preempts the Temperature ISR.
+   */
 
   switch (timer_num) {
     case STEP_TIMER_NUM:
@@ -117,8 +121,9 @@ void HAL_timer_start(uint8_t timer_num, uint32_t frequency) {
       timer_set_count(STEP_TIMER_DEV, 0);
       timer_set_prescaler(STEP_TIMER_DEV, (uint16)(STEPPER_TIMER_PRESCALE - 1));
       timer_set_reload(STEP_TIMER_DEV, 0xFFFF);
-      timer_set_compare(STEP_TIMER_DEV, STEP_TIMER_CHAN, min(HAL_TIMER_TYPE_MAX, (HAL_STEPPER_TIMER_RATE / frequency)));
+      timer_set_compare(STEP_TIMER_DEV, STEP_TIMER_CHAN, MIN(HAL_TIMER_TYPE_MAX, (STEPPER_TIMER_RATE / frequency)));
       timer_attach_interrupt(STEP_TIMER_DEV, STEP_TIMER_CHAN, stepTC_Handler);
+      nvic_irq_set_priority(irq_num, 1);
       timer_generate_update(STEP_TIMER_DEV);
       timer_resume(STEP_TIMER_DEV);
       break;
@@ -127,37 +132,87 @@ void HAL_timer_start(uint8_t timer_num, uint32_t frequency) {
       timer_set_count(TEMP_TIMER_DEV, 0);
       timer_set_prescaler(TEMP_TIMER_DEV, (uint16)(TEMP_TIMER_PRESCALE - 1));
       timer_set_reload(TEMP_TIMER_DEV, 0xFFFF);
-      timer_set_compare(TEMP_TIMER_DEV, TEMP_TIMER_CHAN, min(HAL_TIMER_TYPE_MAX, ((F_CPU / TEMP_TIMER_PRESCALE) / frequency)));
+      timer_set_compare(TEMP_TIMER_DEV, TEMP_TIMER_CHAN, MIN(HAL_TIMER_TYPE_MAX, ((F_CPU / TEMP_TIMER_PRESCALE) / frequency)));
       timer_attach_interrupt(TEMP_TIMER_DEV, TEMP_TIMER_CHAN, tempTC_Handler);
+      nvic_irq_set_priority(irq_num, 2);
       timer_generate_update(TEMP_TIMER_DEV);
       timer_resume(TEMP_TIMER_DEV);
       break;
   }
 }
 
-void HAL_timer_enable_interrupt(uint8_t timer_num) {
+void HAL_timer_enable_interrupt(const uint8_t timer_num) {
   switch (timer_num) {
-    case STEP_TIMER_NUM:
-      timer_enable_irq(STEP_TIMER_DEV, STEP_TIMER_CHAN);
-      break;
-    case TEMP_TIMER_NUM:
-      timer_enable_irq(TEMP_TIMER_DEV, TEMP_TIMER_CHAN);
-      break;
-    default:
-      break;
+    case STEP_TIMER_NUM: ENABLE_STEPPER_DRIVER_INTERRUPT(); break;
+    case TEMP_TIMER_NUM: ENABLE_TEMPERATURE_INTERRUPT(); break;
+    default: break;
   }
 }
 
-void HAL_timer_disable_interrupt(uint8_t timer_num) {
+void HAL_timer_disable_interrupt(const uint8_t timer_num) {
   switch (timer_num) {
-    case STEP_TIMER_NUM:
-      timer_disable_irq(STEP_TIMER_DEV, STEP_TIMER_CHAN);
-      break;
-    case TEMP_TIMER_NUM:
-      timer_disable_irq(TEMP_TIMER_DEV, TEMP_TIMER_CHAN);
-      break;
-    default:
-      break;
+    case STEP_TIMER_NUM: DISABLE_STEPPER_DRIVER_INTERRUPT(); break;
+    case TEMP_TIMER_NUM: DISABLE_TEMPERATURE_INTERRUPT(); break;
+    default: break;
+  }
+}
+
+static inline bool timer_irq_enabled(const timer_dev * const dev, const uint8 interrupt) {
+  return bool(*bb_perip(&(dev->regs).adv->DIER, interrupt));
+}
+
+bool HAL_timer_interrupt_enabled(const uint8_t timer_num) {
+  switch (timer_num) {
+    case STEP_TIMER_NUM: return timer_irq_enabled(STEP_TIMER_DEV, STEP_TIMER_CHAN);
+    case TEMP_TIMER_NUM: return timer_irq_enabled(TEMP_TIMER_DEV, TEMP_TIMER_CHAN);
+  }
+  return false;
+}
+
+timer_dev* get_timer_dev(int number) {
+  switch (number) {
+    #if STM32_HAVE_TIMER(1)
+      case 1: return &timer1;
+    #endif
+    #if STM32_HAVE_TIMER(2)
+      case 2: return &timer2;
+    #endif
+    #if STM32_HAVE_TIMER(3)
+      case 3: return &timer3;
+    #endif
+    #if STM32_HAVE_TIMER(4)
+      case 4: return &timer4;
+    #endif
+    #if STM32_HAVE_TIMER(5)
+      case 5: return &timer5;
+    #endif
+    #if STM32_HAVE_TIMER(6)
+      case 6: return &timer6;
+    #endif
+    #if STM32_HAVE_TIMER(7)
+      case 7: return &timer7;
+    #endif
+    #if STM32_HAVE_TIMER(8)
+      case 8: return &timer8;
+    #endif
+    #if STM32_HAVE_TIMER(9)
+      case 9: return &timer9;
+    #endif
+    #if STM32_HAVE_TIMER(10)
+      case 10: return &timer10;
+    #endif
+    #if STM32_HAVE_TIMER(11)
+      case 11: return &timer11;
+    #endif
+    #if STM32_HAVE_TIMER(12)
+      case 12: return &timer12;
+    #endif
+    #if STM32_HAVE_TIMER(13)
+      case 13: return &timer14;
+    #endif
+    #if STM32_HAVE_TIMER(14)
+      case 14: return &timer14;
+    #endif
   }
 }
 

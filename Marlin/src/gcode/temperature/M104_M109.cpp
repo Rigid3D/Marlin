@@ -64,14 +64,11 @@ void GcodeSuite::M104() {
        * standby mode, for instance in a dual extruder setup, without affecting
        * the running print timer.
        */
-      if (parser.value_celsius() <= (EXTRUDE_MINTEMP) / 2) {
+      if (temp <= (EXTRUDE_MINTEMP) / 2) {
         print_job_timer.stop();
-        LCD_MESSAGEPGM(WELCOME_MSG);
+        lcd_reset_status();
       }
     #endif
-
-    if (parser.value_celsius() > thermalManager.degHotend(e))
-      lcd_status_printf_P(0, PSTR("E%i %s"), e + 1, MSG_HEATING);
   }
 
   #if ENABLED(AUTOTEMP)
@@ -118,13 +115,21 @@ void GcodeSuite::M109() {
        */
       if (parser.value_celsius() <= (EXTRUDE_MINTEMP) / 2) {
         print_job_timer.stop();
-        LCD_MESSAGEPGM(WELCOME_MSG);
+        lcd_reset_status();
       }
       else
         print_job_timer.start();
     #endif
 
-    if (thermalManager.isHeatingHotend(target_extruder)) lcd_status_printf_P(0, PSTR("E%i %s"), target_extruder + 1, MSG_HEATING);
+    #if ENABLED(ULTRA_LCD)
+      const bool heating = thermalManager.isHeatingHotend(target_extruder);
+      if (heating || !no_wait_for_cooling)
+        #if HOTENDS > 1
+          lcd_status_printf_P(0, heating ? PSTR("E%i " MSG_HEATING) : PSTR("E%i " MSG_COOLING), target_extruder + 1);
+        #else
+          lcd_setstatusPGM(heating ? PSTR("E " MSG_HEATING) : PSTR("E " MSG_COOLING));
+        #endif
+    #endif
   }
   else return;
 
@@ -180,7 +185,7 @@ void GcodeSuite::M109() {
     }
 
     idle();
-    refresh_cmd_timeout(); // to prevent stepper_inactive_time from running out
+    reset_stepper_timeout(); // Keep steppers powered
 
     const float temp = thermalManager.degHotend(target_extruder);
 
@@ -202,7 +207,7 @@ void GcodeSuite::M109() {
 
     #if TEMP_RESIDENCY_TIME > 0
 
-      const float temp_diff = FABS(target_temp - temp);
+      const float temp_diff = ABS(target_temp - temp);
 
       if (!residency_start_ms) {
         // Start the TEMP_RESIDENCY_TIME timer when we reach target temp for the first time.
@@ -220,7 +225,7 @@ void GcodeSuite::M109() {
       // break after MIN_COOLING_SLOPE_TIME seconds
       // if the temperature did not drop at least MIN_COOLING_SLOPE_DEG
       if (!next_cool_check_ms || ELAPSED(now, next_cool_check_ms)) {
-        if (old_temp - temp < MIN_COOLING_SLOPE_DEG) break;
+        if (old_temp - temp < float(MIN_COOLING_SLOPE_DEG)) break;
         next_cool_check_ms = now + 1000UL * MIN_COOLING_SLOPE_TIME;
         old_temp = temp;
       }
@@ -229,7 +234,7 @@ void GcodeSuite::M109() {
   } while (wait_for_heatup && TEMP_CONDITIONS);
 
   if (wait_for_heatup) {
-    LCD_MESSAGEPGM(MSG_HEATING_COMPLETE);
+    lcd_reset_status();
     #if ENABLED(PRINTER_EVENT_LEDS)
       leds.set_white();
     #endif

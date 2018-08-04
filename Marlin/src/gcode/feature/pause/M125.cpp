@@ -50,11 +50,11 @@
  */
 void GcodeSuite::M125() {
   // Initial retract before move to filament change position
-  const float retract = parser.seen('L') ? parser.value_axis_units(E_AXIS) : 0
+  const float retract = -ABS(parser.seen('L') ? parser.value_axis_units(E_AXIS) : 0
     #ifdef PAUSE_PARK_RETRACT_LENGTH
-      - (PAUSE_PARK_RETRACT_LENGTH)
+      + (PAUSE_PARK_RETRACT_LENGTH)
     #endif
-  ;
+  );
 
   point_t park_point = NOZZLE_PARK_POINT;
 
@@ -65,7 +65,7 @@ void GcodeSuite::M125() {
   // Lift Z axis
   if (parser.seenval('Z')) park_point.z = parser.linearval('Z');
 
-  #if HOTENDS > 1 && DISABLED(DUAL_X_CARRIAGE)
+  #if HOTENDS > 1 && DISABLED(DUAL_X_CARRIAGE) && DISABLED(DELTA)
     park_point.x += (active_extruder ? hotend_offset[X_AXIS][active_extruder] : 0);
     park_point.y += (active_extruder ? hotend_offset[Y_AXIS][active_extruder] : 0);
   #endif

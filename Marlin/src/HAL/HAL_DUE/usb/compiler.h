@@ -105,7 +105,7 @@
  * \brief Marking \a v as a unused parameter or value.
  */
 #ifndef UNUSED
-#define UNUSED(v)          (void)(v)
+#define UNUSED(x) (void) (x)
 #endif
 
 /**
@@ -444,8 +444,8 @@ typedef struct
 #define ENABLE    1
 #ifndef __cplusplus
 #if !defined(__bool_true_false_are_defined)
-#define false     0
-#define true      1
+#define false 0
+#define true 1
 #endif
 #endif
 #ifndef PASS
@@ -455,10 +455,10 @@ typedef struct
 #define FAIL      1
 #endif
 #ifndef LOW
-#define LOW       0
+#define LOW  0x0
 #endif
 #ifndef HIGH
-#define HIGH      1
+#define HIGH 0x1
 #endif
 //! @}
 
@@ -784,79 +784,6 @@ typedef struct
 #define Align_down(val, n     ) ( (val)              & ~((n) - 1))
 
 //! @}
-
-
-/*! \name Mathematics
- *
- * The same considerations as for clz and ctz apply here but GCC does not
- * provide built-in functions to access the assembly instructions abs, min and
- * max and it does not produce them by itself in most cases, so two sets of
- * macros are defined here:
- *   - Abs, Min and Max to apply to constant expressions (values known at
- *     compile time);
- *   - abs, min and max to apply to non-constant expressions (values unknown at
- *     compile time), abs is found in stdlib.h.
- */
-//! @{
-
-/*! \brief Takes the absolute value of \a a.
- *
- * \param a Input value.
- *
- * \return Absolute value of \a a.
- *
- * \note More optimized if only used with values known at compile time.
- */
-#define Abs(a)              (((a) <  0 ) ? -(a) : (a))
-
-/*! \brief Takes the minimal value of \a a and \a b.
- *
- * \param a Input value.
- * \param b Input value.
- *
- * \return Minimal value of \a a and \a b.
- *
- * \note More optimized if only used with values known at compile time.
- */
-#define Min(a, b)           (((a) < (b)) ?  (a) : (b))
-
-/*! \brief Takes the maximal value of \a a and \a b.
- *
- * \param a Input value.
- * \param b Input value.
- *
- * \return Maximal value of \a a and \a b.
- *
- * \note More optimized if only used with values known at compile time.
- */
-#define Max(a, b)           (((a) > (b)) ?  (a) : (b))
-
-// abs() is already defined by stdlib.h
-
-/*! \brief Takes the minimal value of \a a and \a b.
- *
- * \param a Input value.
- * \param b Input value.
- *
- * \return Minimal value of \a a and \a b.
- *
- * \note More optimized if only used with values unknown at compile time.
- */
-#define min(a, b)   Min(a, b)
-
-/*! \brief Takes the maximal value of \a a and \a b.
- *
- * \param a Input value.
- * \param b Input value.
- *
- * \return Maximal value of \a a and \a b.
- *
- * \note More optimized if only used with values unknown at compile time.
- */
-#define max(a, b)   Max(a, b)
-
-//! @}
-
 
 /*! \brief Calls the routine at address \a addr.
  *

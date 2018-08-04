@@ -47,19 +47,16 @@
 
 // ubl_G29.cpp
 
-enum MeshPointType { INVALID, REAL, SET_IN_BITMAP };
+enum MeshPointType : char { INVALID, REAL, SET_IN_BITMAP };
 
 // External references
-
-char *ftostr43sign(const float&, char);
 
 extern uint8_t ubl_cnt;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if ENABLED(ULTRA_LCD)
-  extern char lcd_status_message[];
-  void lcd_quick_feedback();
+  void lcd_quick_feedback(const bool clear_buttons);
 #endif
 
 #define MESH_X_DIST (float(MESH_MAX_X - (MESH_MIN_X)) / float(GRID_MAX_POINTS_X - 1))
@@ -85,15 +82,14 @@ class unified_bed_leveling {
     #if ENABLED(NEWPANEL)
       static void move_z_with_encoder(const float &multiplier);
       static float measure_point_with_encoder();
-      static float measure_business_card_thickness(const float&);
-      static void manually_probe_remaining_mesh(const float&, const float&, const float&, const float&, const bool);
-      static void fine_tune_mesh(const float &rx, const float &ry, const bool do_ubl_mesh_map);
+      static float measure_business_card_thickness(float in_height);
+      static void manually_probe_remaining_mesh(const float&, const float&, const float&, const float&, const bool) _O0;
+      static void fine_tune_mesh(const float &rx, const float &ry, const bool do_ubl_mesh_map) _O0;
     #endif
 
-    static bool g29_parameter_parsing();
-    static void find_mean_mesh_height();
+    static bool g29_parameter_parsing() _O0;
     static void shift_mesh_height();
-    static void probe_entire_mesh(const float &rx, const float &ry, const bool do_ubl_mesh_map, const bool stow_probe, bool do_furthest);
+    static void probe_entire_mesh(const float &rx, const float &ry, const bool do_ubl_mesh_map, const bool stow_probe, const bool do_furthest) _O0;
     static void tilt_mesh_based_on_3pts(const float &z1, const float &z2, const float &z3);
     static void tilt_mesh_based_on_probed_grid(const bool do_ubl_mesh_map);
     static void g29_what_command();
@@ -104,16 +100,30 @@ class unified_bed_leveling {
 
   public:
 
-    static void echo_name();
-    static void report_state();
+    static void echo_name(
+      #if NUM_SERIAL > 1
+        const int8_t port = -1
+      #endif
+    );
+    static void report_current_mesh(
+      #if NUM_SERIAL > 1
+        const int8_t port = -1
+      #endif
+    );
+    static void report_state(
+      #if NUM_SERIAL > 1
+        const int8_t port = -1
+      #endif
+    );
     static void save_ubl_active_state_and_disable();
     static void restore_ubl_active_state_and_leave();
-    static void display_map(const int);
-    static mesh_index_pair find_closest_mesh_point_of_type(const MeshPointType, const float&, const float&, const bool, uint16_t[16]);
-    static mesh_index_pair find_furthest_invalid_mesh_point();
+    static void display_map(const int) _O0;
+    static mesh_index_pair find_closest_mesh_point_of_type(const MeshPointType, const float&, const float&, const bool, uint16_t[16]) _O0;
+    static mesh_index_pair find_furthest_invalid_mesh_point() _O0;
     static void reset();
     static void invalidate();
-    static void set_all_mesh_points_to_value(const float);
+    static void set_all_mesh_points_to_value(const float value);
+    static void adjust_mesh_to_mean(const bool cflag, const float value);
     static bool sanity_check();
 
     static void G29() _O0;                          // O0 for no optimization
@@ -125,7 +135,7 @@ class unified_bed_leveling {
 
     // 15 is the maximum nubmer of grid points supported + 1 safety margin for now,
     // until determinism prevails
-    constexpr static float _mesh_index_to_xpos[16] PROGMEM = {
+    static constexpr float _mesh_index_to_xpos[16] PROGMEM = {
                               MESH_MIN_X +  0 * (MESH_X_DIST), MESH_MIN_X +  1 * (MESH_X_DIST),
                               MESH_MIN_X +  2 * (MESH_X_DIST), MESH_MIN_X +  3 * (MESH_X_DIST),
                               MESH_MIN_X +  4 * (MESH_X_DIST), MESH_MIN_X +  5 * (MESH_X_DIST),
@@ -136,7 +146,7 @@ class unified_bed_leveling {
                               MESH_MIN_X + 14 * (MESH_X_DIST), MESH_MIN_X + 15 * (MESH_X_DIST)
                             };
 
-    constexpr static float _mesh_index_to_ypos[16] PROGMEM = {
+    static constexpr float _mesh_index_to_ypos[16] PROGMEM = {
                               MESH_MIN_Y +  0 * (MESH_Y_DIST), MESH_MIN_Y +  1 * (MESH_Y_DIST),
                               MESH_MIN_Y +  2 * (MESH_Y_DIST), MESH_MIN_Y +  3 * (MESH_Y_DIST),
                               MESH_MIN_Y +  4 * (MESH_Y_DIST), MESH_MIN_Y +  5 * (MESH_Y_DIST),
@@ -158,14 +168,14 @@ class unified_bed_leveling {
     FORCE_INLINE static void set_z(const int8_t px, const int8_t py, const float &z) { z_values[px][py] = z; }
 
     static int8_t get_cell_index_x(const float &x) {
-      const int8_t cx = (x - (MESH_MIN_X)) * (1.0 / (MESH_X_DIST));
+      const int8_t cx = (x - (MESH_MIN_X)) * (1.0f / (MESH_X_DIST));
       return constrain(cx, 0, (GRID_MAX_POINTS_X) - 1);   // -1 is appropriate if we want all movement to the X_MAX
     }                                                     // position. But with this defined this way, it is possible
                                                           // to extrapolate off of this point even further out. Probably
                                                           // that is OK because something else should be keeping that from
                                                           // happening and should not be worried about at this level.
     static int8_t get_cell_index_y(const float &y) {
-      const int8_t cy = (y - (MESH_MIN_Y)) * (1.0 / (MESH_Y_DIST));
+      const int8_t cy = (y - (MESH_MIN_Y)) * (1.0f / (MESH_Y_DIST));
       return constrain(cy, 0, (GRID_MAX_POINTS_Y) - 1);   // -1 is appropriate if we want all movement to the Y_MAX
     }                                                     // position. But with this defined this way, it is possible
                                                           // to extrapolate off of this point even further out. Probably
@@ -173,12 +183,12 @@ class unified_bed_leveling {
                                                           // happening and should not be worried about at this level.
 
     static int8_t find_closest_x_index(const float &x) {
-      const int8_t px = (x - (MESH_MIN_X) + (MESH_X_DIST) * 0.5) * (1.0 / (MESH_X_DIST));
+      const int8_t px = (x - (MESH_MIN_X) + (MESH_X_DIST) * 0.5) * (1.0f / (MESH_X_DIST));
       return WITHIN(px, 0, GRID_MAX_POINTS_X - 1) ? px : -1;
     }
 
     static int8_t find_closest_y_index(const float &y) {
-      const int8_t py = (y - (MESH_MIN_Y) + (MESH_Y_DIST) * 0.5) * (1.0 / (MESH_Y_DIST));
+      const int8_t py = (y - (MESH_MIN_Y) + (MESH_Y_DIST) * 0.5) * (1.0f / (MESH_Y_DIST));
       return WITHIN(py, 0, GRID_MAX_POINTS_Y - 1) ? py : -1;
     }
 
@@ -217,13 +227,21 @@ class unified_bed_leveling {
             SERIAL_EOL();
           }
         #endif
-        return NAN;
+
+        // The requested location is off the mesh. Return UBL_Z_RAISE_WHEN_OFF_MESH or NAN.
+        return (
+          #ifdef UBL_Z_RAISE_WHEN_OFF_MESH
+            UBL_Z_RAISE_WHEN_OFF_MESH
+          #else
+            NAN
+          #endif
+        );
       }
 
-      const float xratio = (rx0 - mesh_index_to_xpos(x1_i)) * (1.0 / (MESH_X_DIST)),
+      const float xratio = (rx0 - mesh_index_to_xpos(x1_i)) * (1.0f / (MESH_X_DIST)),
                   z1 = z_values[x1_i][yi];
 
-      return z1 + xratio * (z_values[min(x1_i, GRID_MAX_POINTS_X - 2) + 1][yi] - z1); // Don't allow x1_i+1 to be past the end of the array
+      return z1 + xratio * (z_values[MIN(x1_i, GRID_MAX_POINTS_X - 2) + 1][yi] - z1); // Don't allow x1_i+1 to be past the end of the array
                                                                                       // If it is, it is clamped to the last element of the
                                                                                       // z_values[][] array and no correction is applied.
     }
@@ -243,13 +261,21 @@ class unified_bed_leveling {
             SERIAL_EOL();
           }
         #endif
-        return NAN;
+
+        // The requested location is off the mesh. Return UBL_Z_RAISE_WHEN_OFF_MESH or NAN.
+        return (
+          #ifdef UBL_Z_RAISE_WHEN_OFF_MESH
+            UBL_Z_RAISE_WHEN_OFF_MESH
+          #else
+            NAN
+          #endif
+        );
       }
 
-      const float yratio = (ry0 - mesh_index_to_ypos(y1_i)) * (1.0 / (MESH_Y_DIST)),
+      const float yratio = (ry0 - mesh_index_to_ypos(y1_i)) * (1.0f / (MESH_Y_DIST)),
                   z1 = z_values[xi][y1_i];
 
-      return z1 + yratio * (z_values[xi][min(y1_i, GRID_MAX_POINTS_Y - 2) + 1] - z1); // Don't allow y1_i+1 to be past the end of the array
+      return z1 + yratio * (z_values[xi][MIN(y1_i, GRID_MAX_POINTS_Y - 2) + 1] - z1); // Don't allow y1_i+1 to be past the end of the array
                                                                                       // If it is, it is clamped to the last element of the
                                                                                       // z_values[][] array and no correction is applied.
     }
@@ -264,13 +290,22 @@ class unified_bed_leveling {
       const int8_t cx = get_cell_index_x(rx0),
                    cy = get_cell_index_y(ry0); // return values are clamped
 
+      /**
+       * Check if the requested location is off the mesh.  If so, and
+       * UBL_Z_RAISE_WHEN_OFF_MESH is specified, that value is returned.
+       */
+      #ifdef UBL_Z_RAISE_WHEN_OFF_MESH
+        if (!WITHIN(rx0, MESH_MIN_X, MESH_MAX_X) || !WITHIN(ry0, MESH_MIN_Y, MESH_MAX_Y))
+          return UBL_Z_RAISE_WHEN_OFF_MESH;
+      #endif
+
       const float z1 = calc_z0(rx0,
                                mesh_index_to_xpos(cx), z_values[cx][cy],
-                               mesh_index_to_xpos(cx + 1), z_values[min(cx, GRID_MAX_POINTS_X - 2) + 1][cy]);
+                               mesh_index_to_xpos(cx + 1), z_values[MIN(cx, GRID_MAX_POINTS_X - 2) + 1][cy]);
 
       const float z2 = calc_z0(rx0,
-                               mesh_index_to_xpos(cx), z_values[cx][min(cy, GRID_MAX_POINTS_Y - 2) + 1],
-                               mesh_index_to_xpos(cx + 1), z_values[min(cx, GRID_MAX_POINTS_X - 2) + 1][min(cy, GRID_MAX_POINTS_Y - 2) + 1]);
+                               mesh_index_to_xpos(cx), z_values[cx][MIN(cy, GRID_MAX_POINTS_Y - 2) + 1],
+                               mesh_index_to_xpos(cx + 1), z_values[MIN(cx, GRID_MAX_POINTS_X - 2) + 1][MIN(cy, GRID_MAX_POINTS_Y - 2) + 1]);
 
       float z0 = calc_z0(ry0,
                          mesh_index_to_ypos(cy), z1,
@@ -327,17 +362,11 @@ class unified_bed_leveling {
       static void line_to_destination_cartesian(const float &fr, const uint8_t e);
     #endif
 
-    #define _CMPZ(a,b) (z_values[a][b] == z_values[a][b+1])
-    #define CMPZ(a) (_CMPZ(a, 0) && _CMPZ(a, 1))
-    #define ZZER(a) (z_values[a][0] == 0)
-
-    FORCE_INLINE bool mesh_is_valid() {
-      return !(
-        (    CMPZ(0) && CMPZ(1) && CMPZ(2) // adjacent z values all equal?
-          && ZZER(0) && ZZER(1) && ZZER(2) // all zero at the edge?
-        )
-        || isnan(z_values[0][0])
-      );
+    inline static bool mesh_is_valid() {
+      for (uint8_t x = 0; x < GRID_MAX_POINTS_X; x++)
+        for (uint8_t y = 0; y < GRID_MAX_POINTS_Y; y++)
+          if (isnan(z_values[x][y])) return false;
+      return true;
     }
 
 }; // class unified_bed_leveling

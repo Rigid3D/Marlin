@@ -1,4 +1,4 @@
-/*
+/**
  * Marlin 3D Printer Firmware
  * Copyright (C) 2016 MarlinFirmware [https://github.com/MarlinFirmware/Marlin]
  *
@@ -162,22 +162,15 @@ void spiBegin (void) {
     // away. When clock is not known, use a loop instead, which generates
     // shorter code.
     if (__builtin_constant_p(spiClock)) {
-      if (spiClock >= F_CPU / 2) {
-        clockDiv = 0;
-      } else if (spiClock >= F_CPU / 4) {
-        clockDiv = 1;
-      } else if (spiClock >= F_CPU / 8) {
-        clockDiv = 2;
-      } else if (spiClock >= F_CPU / 16) {
-        clockDiv = 3;
-      } else if (spiClock >= F_CPU / 32) {
-        clockDiv = 4;
-      } else if (spiClock >= F_CPU / 64) {
-        clockDiv = 5;
-      } else {
-        clockDiv = 6;
-      }
-    } else {
+      if (spiClock >= F_CPU / 2)       clockDiv = 0;
+      else if (spiClock >= F_CPU / 4)  clockDiv = 1;
+      else if (spiClock >= F_CPU / 8)  clockDiv = 2;
+      else if (spiClock >= F_CPU / 16) clockDiv = 3;
+      else if (spiClock >= F_CPU / 32) clockDiv = 4;
+      else if (spiClock >= F_CPU / 64) clockDiv = 5;
+      else                             clockDiv = 6;
+    }
+    else {
       uint32_t clockSetting = F_CPU / 2;
       clockDiv = 0;
       while (clockDiv < 6 && spiClock < clockSetting) {
@@ -187,8 +180,7 @@ void spiBegin (void) {
     }
 
     // Compensate for the duplicate fosc/64
-    if (clockDiv == 6)
-      clockDiv = 7;
+    if (clockDiv == 6) clockDiv = 7;
 
     // Invert the SPI2X bit
     clockDiv ^= 0x1;
@@ -221,7 +213,7 @@ void spiBegin (void) {
   /** Soft SPI receive byte */
   uint8_t spiRec() {
     uint8_t data = 0;
-    // no interrupts during byte receive - about 8 us
+    // no interrupts during byte receive - about 8µs
     cli();
     // output pin high - like sending 0xFF
     WRITE(MOSI_PIN, HIGH);
@@ -252,7 +244,7 @@ void spiBegin (void) {
   //------------------------------------------------------------------------------
   /** Soft SPI send byte */
   void spiSend(uint8_t data) {
-    // no interrupts during byte send - about 8 us
+    // no interrupts during byte send - about 8µs
     cli();
     for (uint8_t i = 0; i < 8; i++) {
       WRITE(SCK_PIN, LOW);

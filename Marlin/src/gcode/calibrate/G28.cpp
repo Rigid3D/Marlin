@@ -35,6 +35,14 @@
   #include "../../feature/bedlevel/bedlevel.h"
 #endif
 
+#if ENABLED(SENSORLESS_HOMING)
+  #include "../../feature/tmc_util.h"
+#endif
+
+#if HOMING_Z_WITH_PROBE || ENABLED(BLTOUCH)
+  #include "../../module/probe.h"
+#endif
+
 #include "../../lcd/ultralcd.h"
 
 #if ENABLED(QUICK_HOME)
@@ -56,11 +64,23 @@
     const float mlx = max_length(X_AXIS),
                 mly = max_length(Y_AXIS),
                 mlratio = mlx > mly ? mly / mlx : mlx / mly,
-                fr_mm_s = min(homing_feedrate(X_AXIS), homing_feedrate(Y_AXIS)) * SQRT(sq(mlratio) + 1.0);
+                fr_mm_s = MIN(homing_feedrate(X_AXIS), homing_feedrate(Y_AXIS)) * SQRT(sq(mlratio) + 1.0);
+
+    #if ENABLED(SENSORLESS_HOMING)
+      sensorless_homing_per_axis(X_AXIS);
+      sensorless_homing_per_axis(Y_AXIS);
+    #endif
 
     do_blocking_move_to_xy(1.5 * mlx * x_axis_home_dir, 1.5 * mly * home_dir(Y_AXIS), fr_mm_s);
-    endstops.hit_on_purpose(); // clear endstop hit flags
+
+    endstops.validate_homing_move();
+
     current_position[X_AXIS] = current_position[Y_AXIS] = 0.0;
+
+    #if ENABLED(SENSORLESS_HOMING)
+      sensorless_homing_per_axis(X_AXIS, false);
+      sensorless_homing_per_axis(Y_AXIS, false);
+    #endif
   }
 
 #endif // QUICK_HOME
@@ -70,7 +90,7 @@
   inline void home_z_safely() {
 
     // Disallow Z homing if X or Y are unknown
-    if (!axis_known_position[X_AXIS] || !axis_known_position[Y_AXIS]) {
+    if (!TEST(axis_known_position, X_AXIS) || !TEST(axis_known_position, Y_AXIS)) {
       LCD_MESSAGEPGM(MSG_ERR_Z_HOMING);
       SERIAL_ECHO_START();
       SERIAL_ECHOLNPGM(MSG_ERR_Z_HOMING);
@@ -106,8 +126,12 @@
         active_extruder_parked = false;
       #endif
 
+      #if ENABLED(SENSORLESS_HOMING)
+        safe_delay(500); // Short delay needed to settle
+      #endif
+
       do_blocking_move_to_xy(destination[X_AXIS], destination[Y_AXIS]);
-      HOMEAXIS(Z);
+      homeaxis(Z_AXIS);
     }
     else {
       LCD_MESSAGEPGM(MSG_ZPROBE_OUT);
@@ -130,7 +154,11 @@
  *  None  Home to all axes with no parameters.
  *        With QUICK_HOME enabled XY will home together, then Z.
  *
- * Cartesian parameters
+ *  O   Home only if position is unknown
+ *
+ *  Rn  Raise by n mm/inches before homing
+ *
+ * Cartesian/SCARA parameters
  *
  *  X   Home to the X endstop
  *  Y   Home to the Y endstop
@@ -146,8 +174,31 @@ void GcodeSuite::G28(const bool always_home_all) {
     }
   #endif
 
+  #if ENABLED(MARLIN_DEV_MODE)
+    if (parser.seen('S')) {
+      LOOP_XYZ(a) set_axis_is_at_home((AxisEnum)a);
+      SYNC_PLAN_POSITION_KINEMATIC();
+      SERIAL_ECHOLNPGM("Simulated Homing");
+      report_current_position();
+      #if ENABLED(DEBUG_LEVELING_FEATURE)
+        if (DEBUGGING(LEVELING)) SERIAL_ECHOLNPGM("<<< G28");
+      #endif
+      return;
+    }
+  #endif
+
+  if (all_axes_known() && parser.boolval('O')) { // home only if needed
+    #if ENABLED(DEBUG_LEVELING_FEATURE)
+      if (DEBUGGING(LEVELING)) {
+        SERIAL_ECHOLNPGM("> homing not needed, skip");
+        SERIAL_ECHOLNPGM("<<< G28");
+      }
+    #endif
+    return;
+  }
+
   // Wait for planner moves to finish!
-  stepper.synchronize();
+  planner.synchronize();
 
   // Cancel the active G29 session
   #if ENABLED(PROBE_MANUALLY)
@@ -156,8 +207,8 @@ void GcodeSuite::G28(const bool always_home_all) {
 
   // Disable the leveling matrix before homing
   #if HAS_LEVELING
-    #if ENABLED(AUTO_BED_LEVELING_UBL)
-      const bool ubl_state_at_entry = planner.leveling_active;
+    #if ENABLED(RESTORE_LEVELING_AFTER_G28)
+      const bool leveling_was_active = planner.leveling_active;
     #endif
     set_bed_leveling_enabled(false);
   #endif
@@ -166,9 +217,15 @@ void GcodeSuite::G28(const bool always_home_all) {
     workspace_plane = PLANE_XY;
   #endif
 
+  #if ENABLED(BLTOUCH)
+    bltouch_init();
+  #endif
+
   // Always home with tool 0 active
   #if HOTENDS > 1
-    const uint8_t old_tool_index = active_extruder;
+    #if DISABLED(DELTA) || ENABLED(DELTA_HOME_TO_SAFE_ZONE)
+      const uint8_t old_tool_index = active_extruder;
+    #endif
     tool_change(0, 0, true);
   #endif
 
@@ -198,18 +255,20 @@ void GcodeSuite::G28(const bool always_home_all) {
 
     #if Z_HOME_DIR > 0  // If homing away from BED do Z first
 
-      if (home_all || homeZ) {
-        HOMEAXIS(Z);
-        #if ENABLED(DEBUG_LEVELING_FEATURE)
-          if (DEBUGGING(LEVELING)) DEBUG_POS("> HOMEAXIS(Z)", current_position);
-        #endif
-      }
+      if (home_all || homeZ) homeaxis(Z_AXIS);
 
     #endif
 
-    if (home_all || homeX || homeY) {
+    const float z_homing_height = (
+      #if ENABLED(UNKNOWN_Z_NO_RAISE)
+        !TEST(axis_known_position, Z_AXIS) ? 0 :
+      #endif
+          (parser.seenval('R') ? parser.value_linear_units() : Z_HOMING_HEIGHT)
+    );
+
+    if (z_homing_height && (home_all || homeX || homeY)) {
       // Raise Z before homing any other axes and z is not already high enough (never lower z)
-      destination[Z_AXIS] = Z_HOMING_HEIGHT;
+      destination[Z_AXIS] = z_homing_height;
       if (destination[Z_AXIS] > current_position[Z_AXIS]) {
 
         #if ENABLED(DEBUG_LEVELING_FEATURE)
@@ -227,33 +286,36 @@ void GcodeSuite::G28(const bool always_home_all) {
 
     #endif
 
+    // Home Y (before X)
     #if ENABLED(HOME_Y_BEFORE_X)
 
-      // Home Y
-      if (home_all || homeY) {
-        HOMEAXIS(Y);
-        #if ENABLED(DEBUG_LEVELING_FEATURE)
-          if (DEBUGGING(LEVELING)) DEBUG_POS("> homeY", current_position);
+      if (home_all || homeY
+        #if ENABLED(CODEPENDENT_XY_HOMING)
+          || homeX
         #endif
-      }
+      ) homeaxis(Y_AXIS);
 
     #endif
 
     // Home X
-    if (home_all || homeX) {
+    if (home_all || homeX
+      #if ENABLED(CODEPENDENT_XY_HOMING) && DISABLED(HOME_Y_BEFORE_X)
+        || homeY
+      #endif
+    ) {
 
       #if ENABLED(DUAL_X_CARRIAGE)
 
         // Always home the 2nd (right) extruder first
         active_extruder = 1;
-        HOMEAXIS(X);
+        homeaxis(X_AXIS);
 
         // Remember this extruder's position for later tool change
         inactive_extruder_x_pos = current_position[X_AXIS];
 
         // Home the 1st (left) extruder
         active_extruder = 0;
-        HOMEAXIS(X);
+        homeaxis(X_AXIS);
 
         // Consider the active extruder to be parked
         COPY(raised_parked_position, current_position);
@@ -262,23 +324,14 @@ void GcodeSuite::G28(const bool always_home_all) {
 
       #else
 
-        HOMEAXIS(X);
+        homeaxis(X_AXIS);
 
-      #endif
-
-      #if ENABLED(DEBUG_LEVELING_FEATURE)
-        if (DEBUGGING(LEVELING)) DEBUG_POS("> homeX", current_position);
       #endif
     }
 
+    // Home Y (after X)
     #if DISABLED(HOME_Y_BEFORE_X)
-      // Home Y
-      if (home_all || homeY) {
-        HOMEAXIS(Y);
-        #if ENABLED(DEBUG_LEVELING_FEATURE)
-          if (DEBUGGING(LEVELING)) DEBUG_POS("> homeY", current_position);
-        #endif
-      }
+      if (home_all || homeY) homeaxis(Y_AXIS);
     #endif
 
     // Home Z last if homing towards the bed
@@ -287,11 +340,13 @@ void GcodeSuite::G28(const bool always_home_all) {
         #if ENABLED(Z_SAFE_HOMING)
           home_z_safely();
         #else
-          HOMEAXIS(Z);
+          homeaxis(Z_AXIS);
         #endif
-        #if ENABLED(DEBUG_LEVELING_FEATURE)
-          if (DEBUGGING(LEVELING)) DEBUG_POS("> (home_all || homeZ) > final", current_position);
+
+        #if HOMING_Z_WITH_PROBE && defined(Z_AFTER_PROBING)
+          move_z_after_probing();
         #endif
+
       } // home_all || homeZ
     #endif // Z_HOME_DIR < 0
 
@@ -306,14 +361,14 @@ void GcodeSuite::G28(const bool always_home_all) {
     do_blocking_move_to_z(delta_clip_start_height);
   #endif
 
-  #if ENABLED(AUTO_BED_LEVELING_UBL)
-    set_bed_leveling_enabled(ubl_state_at_entry);
+  #if ENABLED(RESTORE_LEVELING_AFTER_G28)
+    set_bed_leveling_enabled(leveling_was_active);
   #endif
 
   clean_up_after_endstop_or_probe_move();
 
   // Restore the active tool after homing
-  #if HOTENDS > 1
+  #if HOTENDS > 1 && (DISABLED(DELTA) || ENABLED(DELTA_HOME_TO_SAFE_ZONE))
     #if ENABLED(PARKING_EXTRUDER)
       #define NO_FETCH false // fetch the previous toolhead
     #else

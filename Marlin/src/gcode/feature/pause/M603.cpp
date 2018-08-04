@@ -41,13 +41,13 @@
  *  L[distance] - Extrude distance for insertion, for the specified extruder
  *
  */
-inline void GcodeSuite::M603() {
+void GcodeSuite::M603() {
 
   if (get_target_extruder_from_command()) return;
 
   // Unload length
   if (parser.seen('U')) {
-    filament_change_unload_length[target_extruder] = FABS(parser.value_axis_units(E_AXIS));
+    filament_change_unload_length[target_extruder] = ABS(parser.value_axis_units(E_AXIS));
     #if ENABLED(PREVENT_LENGTHY_EXTRUDE)
       NOMORE(filament_change_unload_length[target_extruder], EXTRUDE_MAXLENGTH);
     #endif
@@ -55,7 +55,7 @@ inline void GcodeSuite::M603() {
 
   // Load length
   if (parser.seen('L')) {
-    filament_change_load_length[target_extruder] = FABS(parser.value_axis_units(E_AXIS));
+    filament_change_load_length[target_extruder] = ABS(parser.value_axis_units(E_AXIS));
     #if ENABLED(PREVENT_LENGTHY_EXTRUDE)
       NOMORE(filament_change_load_length[target_extruder], EXTRUDE_MAXLENGTH);
     #endif

@@ -26,13 +26,11 @@
 /**
  * Axis indices as enumerated constants
  *
- * Special axis:
- *  - A_AXIS and B_AXIS are used by COREXY printers
- *  - X_HEAD and Y_HEAD is used for systems that don't have a 1:1 relationship
- *    between X_AXIS and X Head movement, like CoreXY bots
+ *  - X_AXIS, Y_AXIS, and Z_AXIS should be used for axes in Cartesian space
+ *  - A_AXIS, B_AXIS, and C_AXIS should be used for Steppers, corresponding to XYZ on Cartesians
+ *  - X_HEAD, Y_HEAD, and Z_HEAD should be used for Steppers on Core kinematics
  */
-enum AxisEnum {
-  NO_AXIS   = -1,
+enum AxisEnum : unsigned char {
   X_AXIS    = 0,
   A_AXIS    = 0,
   Y_AXIS    = 1,
@@ -43,11 +41,12 @@ enum AxisEnum {
   X_HEAD    = 4,
   Y_HEAD    = 5,
   Z_HEAD    = 6,
-  ALL_AXES  = 100
+  ALL_AXES  = 0xFE,
+  NO_AXIS   = 0xFF
 };
 
-#define LOOP_S_LE_N(VAR, S, N) for (uint8_t VAR=S; VAR<=N; VAR++)
-#define LOOP_S_L_N(VAR, S, N) for (uint8_t VAR=S; VAR<N; VAR++)
+#define LOOP_S_LE_N(VAR, S, N) for (uint8_t VAR=(S); VAR<=(N); VAR++)
+#define LOOP_S_L_N(VAR, S, N) for (uint8_t VAR=(S); VAR<(N); VAR++)
 #define LOOP_LE_N(VAR, N) LOOP_S_LE_N(VAR, 0, N)
 #define LOOP_L_N(VAR, N) LOOP_S_L_N(VAR, 0, N)
 
@@ -55,6 +54,9 @@ enum AxisEnum {
 #define LOOP_XYZ(VAR) LOOP_S_LE_N(VAR, X_AXIS, Z_AXIS)
 #define LOOP_XYZE(VAR) LOOP_S_LE_N(VAR, X_AXIS, E_AXIS)
 #define LOOP_XYZE_N(VAR) LOOP_S_L_N(VAR, X_AXIS, XYZE_N)
+#define LOOP_ABC(VAR) LOOP_S_LE_N(VAR, A_AXIS, C_AXIS)
+#define LOOP_ABCE(VAR) LOOP_S_LE_N(VAR, A_AXIS, E_AXIS)
+#define LOOP_ABCE_N(VAR) LOOP_S_L_N(VAR, A_AXIS, XYZE_N)
 
 typedef enum {
   LINEARUNIT_MM,
@@ -70,12 +72,12 @@ typedef enum {
 /**
  * SD Card
  */
-enum LsAction { LS_SerialPrint, LS_Count, LS_GetFilename };
+enum LsAction : char { LS_SerialPrint, LS_Count, LS_GetFilename };
 
 /**
  * Ultra LCD
  */
-enum LCDViewAction {
+enum LCDViewAction : char {
   LCDVIEW_NONE,
   LCDVIEW_REDRAW_NOW,
   LCDVIEW_CALL_REDRAW_NEXT,

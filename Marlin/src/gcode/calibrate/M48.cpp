@@ -40,7 +40,7 @@
  * M48: Z probe repeatability measurement function.
  *
  * Usage:
- *   M48 <P#> <X#> <Y#> <V#> <E> <L#>
+ *   M48 <P#> <X#> <Y#> <V#> <E> <L#> <S>
  *     P = Number of sampled points (4-50, default 10)
  *     X = Sample X position
  *     Y = Sample Y position
@@ -70,7 +70,7 @@ void GcodeSuite::M48() {
     return;
   }
 
-  const bool stow_probe_after_each = parser.boolval('E');
+  const ProbePtRaise raise_after = parser.boolval('E') ? PROBE_PT_STOW : PROBE_PT_RAISE;
 
   float X_current = current_position[X_AXIS],
         Y_current = current_position[Y_AXIS];
@@ -78,21 +78,10 @@ void GcodeSuite::M48() {
   const float X_probe_location = parser.linearval('X', X_current + X_PROBE_OFFSET_FROM_EXTRUDER),
               Y_probe_location = parser.linearval('Y', Y_current + Y_PROBE_OFFSET_FROM_EXTRUDER);
 
-  #if DISABLED(DELTA)
-    if (!WITHIN(X_probe_location, MIN_PROBE_X, MAX_PROBE_X)) {
-      out_of_range_error(PSTR("X"));
-      return;
-    }
-    if (!WITHIN(Y_probe_location, MIN_PROBE_Y, MAX_PROBE_Y)) {
-      out_of_range_error(PSTR("Y"));
-      return;
-    }
-  #else
-    if (!position_is_reachable_by_probe(X_probe_location, Y_probe_location)) {
-      SERIAL_PROTOCOLLNPGM("? (X,Y) location outside of probeable radius.");
-      return;
-    }
-  #endif
+  if (!position_is_reachable_by_probe(X_probe_location, Y_probe_location)) {
+    SERIAL_PROTOCOLLNPGM("? (X,Y) out of bounds.");
+    return;
+  }
 
   bool seen_L = parser.seen('L');
   uint8_t n_legs = seen_L ? parser.value_byte() : 0;
@@ -122,10 +111,10 @@ void GcodeSuite::M48() {
 
   setup_for_endstop_or_probe_move();
 
-  double mean = 0.0, sigma = 0.0, min = 99999.9, max = -99999.9, sample_set[n_samples];
+  float mean = 0.0, sigma = 0.0, min = 99999.9, max = -99999.9, sample_set[n_samples];
 
   // Move to the first point, deploy, and probe
-  const float t = probe_pt(X_probe_location, Y_probe_location, stow_probe_after_each, verbose_level);
+  const float t = probe_pt(X_probe_location, Y_probe_location, raise_after, verbose_level);
   bool probing_good = !isnan(t);
 
   if (probing_good) {
@@ -137,10 +126,10 @@ void GcodeSuite::M48() {
         float angle = random(0, 360);
         const float radius = random(
           #if ENABLED(DELTA)
-            (int) (0.1250000000 * (DELTA_PROBEABLE_RADIUS)),
-            (int) (0.3333333333 * (DELTA_PROBEABLE_RADIUS))
+            (int) (0.1250000000 * (DELTA_PRINTABLE_RADIUS)),
+            (int) (0.3333333333 * (DELTA_PRINTABLE_RADIUS))
           #else
-            (int) 5.0, (int) (0.125 * min(X_BED_SIZE, Y_BED_SIZE))
+            (int) 5.0, (int) (0.125 * MIN(X_BED_SIZE, Y_BED_SIZE))
           #endif
         );
 
@@ -153,7 +142,7 @@ void GcodeSuite::M48() {
         }
 
         for (uint8_t l = 0; l < n_legs - 1; l++) {
-          double delta_angle;
+          float delta_angle;
 
           if (schizoid_flag)
             // The points of a 5 point star are 72 degrees apart.  We need to
@@ -201,7 +190,7 @@ void GcodeSuite::M48() {
       } // n_legs
 
       // Probe a single point
-      sample_set[n] = probe_pt(X_probe_location, Y_probe_location, stow_probe_after_each, 0);
+      sample_set[n] = probe_pt(X_probe_location, Y_probe_location, raise_after, 0);
 
       // Break the loop if the probe fails
       probing_good = !isnan(sample_set[n]);
@@ -210,7 +199,7 @@ void GcodeSuite::M48() {
       /**
        * Get the current mean for the data points we have so far
        */
-      double sum = 0.0;
+      float sum = 0.0;
       for (uint8_t j = 0; j <= n; j++) sum += sample_set[j];
       mean = sum / (n + 1);
 

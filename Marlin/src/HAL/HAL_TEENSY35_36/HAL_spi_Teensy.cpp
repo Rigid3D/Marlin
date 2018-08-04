@@ -1,6 +1,6 @@
 #if defined(__MK64FX512__) || defined(__MK66FX1M0__)
 
-#include "../HAL.h"
+#include "HAL.h"
 #include <SPI.h>
 #include <pins_arduino.h>
 #include "spi_pins.h"
@@ -91,12 +91,12 @@ void spiSendBlock(uint8_t token, const uint8_t* buf) {
   SPI.beginTransaction(spiConfig);
   SPDR = token;
   for (uint16_t i = 0; i < 512; i += 2) {
-    while (!TEST(SPSR, SPIF)) { /* Intentionally left empty */ }
+    while (!TEST(SPSR, SPIF)) { /* nada */ };
     SPDR = buf[i];
-    while (!TEST(SPSR, SPIF)) { /* Intentionally left empty */ }
+    while (!TEST(SPSR, SPIF)) { /* nada */ };
     SPDR = buf[i + 1];
   }
-  while (!TEST(SPSR, SPIF)) { /* Intentionally left empty */ }
+  while (!TEST(SPSR, SPIF)) { /* nada */ };
   SPI.endTransaction();
 }
 

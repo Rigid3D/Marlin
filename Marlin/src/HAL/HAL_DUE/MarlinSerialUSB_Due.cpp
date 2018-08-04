@@ -33,9 +33,14 @@
 
 #include "MarlinSerialUSB_Due.h"
 
+#if ENABLED(EMERGENCY_PARSER)
+  #include "../../feature/emergency_parser.h"
+#endif
+
 // Imports from Atmel USB Stack/CDC implementation
 extern "C" {
   bool usb_task_cdc_isenabled(void);
+  bool usb_task_cdc_dtr_active(void);
   bool udi_cdc_is_rx_ready(void);
   int udi_cdc_getc(void);
   bool udi_cdc_is_tx_ready(void);
@@ -44,6 +49,10 @@ extern "C" {
 
 // Pending character
 static int pending_char = -1;
+
+#if ENABLED(EMERGENCY_PARSER)
+  static EmergencyParser::State emergency_state; // = EP_RESET
+#endif
 
 // Public Methods
 void MarlinSerialUSB::begin(const long baud_setting) {
@@ -56,13 +65,20 @@ int MarlinSerialUSB::peek(void) {
   if (pending_char >= 0)
     return pending_char;
 
+  // If USB CDC not enumerated or not configured on the PC side
   if (!usb_task_cdc_isenabled())
     return -1;
 
+  // If no bytes sent from the PC
   if (!udi_cdc_is_rx_ready())
     return -1;
 
   pending_char = udi_cdc_getc();
+
+  #if ENABLED(EMERGENCY_PARSER)
+    emergency_parser.update(emergency_state, (char)pending_char);
+  #endif
+
   return pending_char;
 }
 
@@ -73,17 +89,28 @@ int MarlinSerialUSB::read(void) {
     return ret;
   }
 
+  // If USB CDC not enumerated or not configured on the PC side
   if (!usb_task_cdc_isenabled())
     return -1;
 
+  // If no bytes sent from the PC
   if (!udi_cdc_is_rx_ready())
     return -1;
 
-  return udi_cdc_getc();
+  int c = udi_cdc_getc();
+
+  #if ENABLED(EMERGENCY_PARSER)
+    emergency_parser.update(emergency_state, (char)c);
+  #endif
+
+  return c;
 }
 
 bool MarlinSerialUSB::available(void) {
+    /* If Pending chars */
   return pending_char >= 0 ||
+    /* or USB CDC enumerated and configured on the PC side and some
+       bytes where sent to us */
       (usb_task_cdc_isenabled() && udi_cdc_is_rx_ready());
 }
 
@@ -92,11 +119,22 @@ void MarlinSerialUSB::flush(void) {
 
 void MarlinSerialUSB::write(const uint8_t c) {
 
+  /* Do not even bother sending anything if USB CDC is not enumerated
+     or not configured on the PC side or there is no program on the PC
+     listening to our messages */
+  if (!usb_task_cdc_isenabled() || !usb_task_cdc_dtr_active())
+    return;
+
+  /* Wait until the PC has read the pending to be sent data */
   while (usb_task_cdc_isenabled() &&
+         usb_task_cdc_dtr_active() &&
         !udi_cdc_is_tx_ready()) {
   };
 
-  if (!usb_task_cdc_isenabled())
+  /* Do not even bother sending anything if USB CDC is not enumerated
+     or not configured on the PC side or there is no program on the PC
+     listening to our messages at this point */
+  if (!usb_task_cdc_isenabled() || !usb_task_cdc_dtr_active())
     return;
 
   // Fifo full

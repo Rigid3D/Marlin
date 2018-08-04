@@ -21,7 +21,7 @@
  */
 
 #if !defined(__STM32F1__) && !defined(__STM32F4__)
-    #error "Oops!  Make sure you have an STM32F1/4 board selected from the 'Tools -> Boards' menu."
+  #error "Oops!  Make sure you have an STM32F1/4 board selected from the 'Tools -> Boards' menu."
 #endif
 
 /**
@@ -30,8 +30,6 @@
 
 #define DEFAULT_MACHINE_NAME "STM32F103RET6"
 #define BOARD_NAME "Marlin for STM32"
-
-#define LARGE_FLASH true
 
 // Enable I2C_EEPROM for testing
 #define I2C_EEPROM
@@ -97,7 +95,7 @@
 //
 // Heaters / Fans
 //
-#define HEATER_0_PIN       PD12  // EXTRUDER 1
+#define HEATER_0_PIN       PD12   // EXTRUDER 1
 #define HEATER_1_PIN       PD13
 #define HEATER_2_PIN       PD14
 
@@ -105,7 +103,9 @@
 #define HEATER_BED2_PIN    -1    // BED2
 #define HEATER_BED3_PIN    -1    // BED3
 
-#define FAN_PIN            PB10
+#ifndef FAN_PIN
+  #define FAN_PIN          PB10
+#endif
 
 #define FAN_SOFT_PWM
 
@@ -123,9 +123,9 @@
 #if ENABLED(ULTRA_LCD)
 
   #if ENABLED(REPRAPWORLD_GRAPHICAL_LCD)
-    #define LCD_PINS_RS         49 // CS chip select /SS chip slave select
-    #define LCD_PINS_ENABLE     51 // SID (MOSI)
-    #define LCD_PINS_D4         52 // SCK (CLK) clock
+    #define LCD_PINS_RS         49   // CS chip select /SS chip slave select
+    #define LCD_PINS_ENABLE     51   // SID (MOSI)
+    #define LCD_PINS_D4         52   // SCK (CLK) clock
   #elif ENABLED(NEWPANEL) && ENABLED(PANEL_ONE)
     #define LCD_PINS_RS         PB8
     #define LCD_PINS_ENABLE     PD2
@@ -186,8 +186,8 @@
 
     #elif ENABLED(LCD_I2C_VIKI)
 
-      #define BTN_EN1           22 // http://files.panucatt.com/datasheets/viki_wiring_diagram.pdf explains 40/42.
-      #define BTN_EN2            7 // 22/7 are unused on RAMPS_14. 22 is unused and 7 the SERVO0_PIN on RAMPS_13.
+      #define BTN_EN1           22   // http://files.panucatt.com/datasheets/viki_wiring_diagram.pdf explains 40/42.
+      #define BTN_EN2            7   // 22/7 are unused on RAMPS_14. 22 is unused and 7 the SERVO0_PIN on RAMPS_13.
 
       #define BTN_ENC           -1
       #define LCD_SDSS          53
@@ -207,7 +207,7 @@
       #define BTN_ENC           39
 
       #define SDSS              53
-      #define SD_DETECT_PIN     -1 // Pin 49 for display sd interface, 72 for easy adapter board
+      #define SD_DETECT_PIN     -1   // Pin 49 for display sd interface, 72 for easy adapter board
 
       #define KILL_PIN          31
 
@@ -215,6 +215,7 @@
       #define STAT_LED_BLUE_PIN 35
 
     #elif ENABLED(ELB_FULL_GRAPHIC_CONTROLLER)
+
       #define BTN_EN1           35
       #define BTN_EN2           37
       #define BTN_ENC           31
@@ -225,12 +226,14 @@
       #define DOGLCD_CS         29
       #define DOGLCD_A0         27
       #define LCD_BACKLIGHT_PIN 33
+
     #elif ENABLED(MINIPANEL)
+
       #define BEEPER_PIN        42
       // Pins for DOGM SPI LCD Support
       #define DOGLCD_A0         44
       #define DOGLCD_CS         66
-      #define LCD_BACKLIGHT_PIN 65 // backlight LED on A11/D65
+      #define LCD_BACKLIGHT_PIN 65   // backlight LED on A11/D65
       #define SDSS              53
 
       #define KILL_PIN          64
@@ -261,9 +264,9 @@
         #define SHIFT_CLK       44
         #define SHIFT_LD        42
       #elif ENABLED(PANEL_ONE)
-        #define BTN_EN1         59 // AUX2 PIN 3
-        #define BTN_EN2         63 // AUX2 PIN 4
-        #define BTN_ENC         49 // AUX3 PIN 7
+        #define BTN_EN1         59   // AUX2 PIN 3
+        #define BTN_EN2         63   // AUX2 PIN 4
+        #define BTN_ENC         49   // AUX3 PIN 7
       #else
         #define BTN_EN1         37
         #define BTN_EN2         35
@@ -274,7 +277,7 @@
         #define SD_DETECT_PIN   49
         #define KILL_PIN        41
       #else
-        //#define SD_DETECT_PIN -1 // Ramps doesn't use this
+        //#define SD_DETECT_PIN -1   // Ramps doesn't use this
       #endif
 
     #endif

@@ -30,8 +30,8 @@
 #ifndef LANGUAGE_EL_H
 #define LANGUAGE_EL_H
 
-#define MAPPER_CECF
 #define DISPLAY_CHARSET_ISO10646_GREEK
+#define CHARSIZE 2
 
 #define WELCOME_MSG                         MACHINE_NAME _UxGT(" έτοιμο.")
 #define MSG_SD_INSERTED                     _UxGT("Εισαγωγή κάρτας")
@@ -44,6 +44,7 @@
 #define MSG_AUTO_HOME_X                     _UxGT("Αρχικό σημείο X")
 #define MSG_AUTO_HOME_Y                     _UxGT("Αρχικό σημείο Y")
 #define MSG_AUTO_HOME_Z                     _UxGT("Αρχικό σημείο Z")
+#define MSG_TMC_Z_CALIBRATION               _UxGT("Βαθμονόμηση Z")
 #define MSG_LEVEL_BED_HOMING                _UxGT("Επαναφορά Επ. Εκτύπωσης") //SHORTEN
 #define MSG_LEVEL_BED_WAITING               _UxGT("Επιπεδοποίηση επ. Εκτύπωσης περιμενει") //SHORTEN
 #define MSG_LEVEL_BED_NEXT_POINT            _UxGT("Επόμενο σημείο")
@@ -95,10 +96,16 @@
 #define MSG_PID_C                           _UxGT("PID-C")
 #define MSG_ACC                             _UxGT("Επιτάχυνση")
 #define MSG_JERK                            _UxGT("Jerk")
-#define MSG_VX_JERK                         _UxGT("Vαντίδραση x")
-#define MSG_VY_JERK                         _UxGT("Vαντίδραση y")
-#define MSG_VZ_JERK                         _UxGT("Vαντίδραση z")
-#define MSG_VE_JERK                         _UxGT("Vαντίδραση e")
+#if IS_KINEMATIC
+  #define MSG_VA_JERK                       _UxGT("Vαντίδραση A")
+  #define MSG_VB_JERK                       _UxGT("Vαντίδραση B")
+  #define MSG_VC_JERK                       _UxGT("Vαντίδραση C")
+#else
+  #define MSG_VA_JERK                       _UxGT("Vαντίδραση X")
+  #define MSG_VB_JERK                       _UxGT("Vαντίδραση Y")
+  #define MSG_VC_JERK                       _UxGT("Vαντίδραση Z")
+#endif
+#define MSG_VE_JERK                         _UxGT("Vαντίδραση E")
 #define MSG_VMAX                            _UxGT("V Μέγιστο")
 #define MSG_VMIN                            _UxGT("V Ελάχιστο")
 #define MSG_VTRAV_MIN                       _UxGT("Vελάχ. μετατόπιση")
@@ -107,9 +114,15 @@
 #define MSG_A_RETRACT                       _UxGT("Α-ανάσυρση")
 #define MSG_A_TRAVEL                        _UxGT("Α-μετατόπιση")
 #define MSG_STEPS_PER_MM                    _UxGT("Bήματα ανά μμ")
-#define MSG_XSTEPS                          _UxGT("Bήματα X ανά μμ")
-#define MSG_YSTEPS                          _UxGT("Bήματα Υ ανά μμ")
-#define MSG_ZSTEPS                          _UxGT("Bήματα Ζ ανά μμ")
+#if IS_KINEMATIC
+  #define MSG_ASTEPS                        _UxGT("Bήματα A ανά μμ")
+  #define MSG_BSTEPS                        _UxGT("Bήματα B ανά μμ")
+  #define MSG_CSTEPS                        _UxGT("Bήματα C ανά μμ")
+#else
+  #define MSG_ASTEPS                        _UxGT("Bήματα X ανά μμ")
+  #define MSG_BSTEPS                        _UxGT("Bήματα Y ανά μμ")
+  #define MSG_CSTEPS                        _UxGT("Bήματα Z ανά μμ")
+#endif
 #define MSG_ESTEPS                          _UxGT("Bήματα Ε ανά μμ")
 #define MSG_E1STEPS                         _UxGT("Bήματα Ε1 ανά μμ")
 #define MSG_E2STEPS                         _UxGT("Bήματα Ε2 ανά μμ")
@@ -136,7 +149,6 @@
 #define MSG_NO_CARD                         _UxGT("Δεν βρέθηκε SD")
 #define MSG_DWELL                           _UxGT("Αναστολή λειτουργίας")
 #define MSG_USERWAIT                        _UxGT("Αναμονή για χρήστη")
-#define MSG_RESUMING                        _UxGT("Συνεχίζεται η εκτύπωση") //SHORTEN
 #define MSG_PRINT_ABORTED                   _UxGT("Διακόπτεται η εκτύπωση") //SHORTEN
 #define MSG_NO_MOVE                         _UxGT("Καμία κίνηση.")
 #define MSG_KILLED                          _UxGT("ΤΕΡΜΑΤΙΣΜΟΣ. ")
@@ -169,9 +181,7 @@
 #define MSG_ERR_MINTEMP_BED                 _UxGT("ΕΛΑΧΙΣΤΗ ΘΕΡΜΟΚΡΑΣΙΑΣ ΕΠ. ΕΚΤΥΠΩΣΗΣ") //SHORTEN
 #define MSG_HALTED                          _UxGT("H εκτύπωση διακόπηκε")
 #define MSG_HEATING                         _UxGT("Θερμαίνεται…")
-#define MSG_HEATING_COMPLETE                _UxGT("Η θέρμανση ολοκληρώθηκε.") //SHORTEN
 #define MSG_BED_HEATING                     _UxGT("Θέρμανση ΕΠ. Εκτύπωσης") //SHORTEN
-#define MSG_BED_DONE                        _UxGT("Η Επ. Εκτύπωσης ολοκληρώθηκε") //SHORTEN
 #define MSG_DELTA_CALIBRATE                 _UxGT("Βαθμονόμηση Delta")
 #define MSG_DELTA_CALIBRATE_X               _UxGT("Βαθμονόμηση X")
 #define MSG_DELTA_CALIBRATE_Y               _UxGT("Βαθμονόμηση Y")

@@ -48,17 +48,13 @@
 #define _CONF_ACCESS_H_
 
 #include "compiler.h"
-
+#include "../../../inc/MarlinConfigPre.h"
 
 /*! \name Activation of Logical Unit Numbers
  */
 //! @{
 
-#ifdef SDSUPPORT
-  #define LUN_0              ENABLE    //!< SD/MMC Card over MCI Slot 0.
-#else
-  #define LUN_0              DISABLE
-#endif
+#define LUN_0                ENABLE    //!< SD/MMC Card over MCI Slot 0.
 #define LUN_1                DISABLE
 #define LUN_2                DISABLE
 #define LUN_3                DISABLE

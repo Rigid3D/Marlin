@@ -74,15 +74,17 @@
 #include "../../inc/MarlinConfig.h"
 #include <lpc17xx_pinsel.h>
 #include "LPC1768_PWM.h"
-#include "arduino.h"
+#include <Arduino.h>
 
 #define NUM_ISR_PWMS 20
 
+#define HAL_PWM_TIMER      LPC_TIM3
+#define HAL_PWM_TIMER_ISR  extern "C" void TIMER3_IRQHandler(void)
+#define HAL_PWM_TIMER_IRQn TIMER3_IRQn
 
 #define LPC_PORT_OFFSET         (0x0020)
 #define LPC_PIN(pin)            (1UL << pin)
 #define LPC_GPIO(port)          ((volatile LPC_GPIO_TypeDef *)(LPC_GPIO0_BASE + LPC_PORT_OFFSET * port))
-
 
 typedef struct {            // holds all data needed to control/init one of the PWM channels
   bool                active_flag;    // THIS TABLE ENTRY IS ACTIVELY TOGGLING A PIN
@@ -166,11 +168,13 @@ void LPC1768_PWM_init(void) {
   LPC_SC->PCLKSEL0 &= ~(0x3 << PCLK_PWM1);
   LPC_SC->PCLKSEL0 |= (LPC_PWM1_PCLKSEL0 << PCLK_PWM1);
 
+  uint32_t PR = (CLKPWR_GetPCLK(CLKPWR_PCLKSEL_PWM1) / 1000000) - 1;      // Prescalar to create 1 MHz output
+
   LPC_PWM1->MR0  = LPC_PWM1_MR0;                                          // TC resets every 19,999 + 1 cycles - sets PWM cycle(Ton+Toff) to 20 mS
   // MR0 must be set before TCR enables the PWM
   LPC_PWM1->TCR  = _BV(SBIT_CNTEN) | _BV(SBIT_CNTRST) | _BV(SBIT_PWMEN);  // Enable counters, reset counters, set mode to PWM
   CBI(LPC_PWM1->TCR, SBIT_CNTRST);                                        // Take counters out of reset
-  LPC_PWM1->PR   =  LPC_PWM1_PR;
+  LPC_PWM1->PR   = PR;
   LPC_PWM1->MCR  = _BV(SBIT_PWMMR0R) | _BV(0);                            // Reset TC if it matches MR0, disable all interrupts except for MR0
   LPC_PWM1->CTCR = 0;                                                     // Disable counter mode (enable PWM mode)
   LPC_PWM1->LER  = 0x07F;                                                 // Set the latch Enable Bits to load the new Match Values for MR0 - MR6
@@ -179,7 +183,7 @@ void LPC1768_PWM_init(void) {
   ////  interrupt controlled PWM setup
 
   LPC_SC->PCONP |= 1 << 23;  // power on timer3
-  HAL_PWM_TIMER->PR = LPC_PWM1_PR;
+  HAL_PWM_TIMER->PR = PR;
   HAL_PWM_TIMER->MCR = 0x0B;              // Interrupt on MR0 & MR1, reset on MR0
   HAL_PWM_TIMER->MR0 = LPC_PWM1_MR0;
   HAL_PWM_TIMER->MR1 = 0;
@@ -211,12 +215,12 @@ void LPC1768_PWM_sort(void) {
   }
 }
 
-bool LPC1768_PWM_attach_pin(pin_t pin, uint32_t min /* = 1 */, uint32_t max /* = (LPC_PWM1_MR0 - 1) */, uint8_t servo_index /* = 0xff */) {
+bool LPC1768_PWM_attach_pin(pin_t pin, uint32_t min /* = 1 */, uint32_t max /* = (LPC_PWM1_MR0 - 1) */, uint8_t servo_index /* = 0xFF */) {
 
   pin = GET_PIN_MAP_PIN(GET_PIN_MAP_INDEX(pin & 0xFF));  // Sometimes the upper byte is garbled
 
 ////  direct control PWM code
-  switch(pin) {
+  switch (pin) {
     case P1_23:                                       // MKS Sbase Servo 0, PWM1 channel 4  (J3-8 PWM1.4)
       direct_table[P1_23_PWM_channel - 1].min = min;
       direct_table[P1_23_PWM_channel - 1].max = MIN(max, LPC_PWM1_MR0 - MR0_MARGIN);
@@ -253,6 +257,11 @@ bool LPC1768_PWM_attach_pin(pin_t pin, uint32_t min /* = 1 */, uint32_t max /* =
   NVIC_DisableIRQ(HAL_PWM_TIMER_IRQn);    // make it safe to update the active table
                                  // OK to update the active table because the
                                  // ISR doesn't use any of the changed items
+
+  // We NEED memory barriers to ensure Interrupts are actually disabled!
+  // ( https://dzone.com/articles/nvic-disabling-interrupts-on-arm-cortex-m-and-the )
+  __DSB();
+  __ISB();
 
   if (ISR_table_update) //use work table if that's the newest
     temp_table = work_table;
@@ -296,7 +305,7 @@ bool LPC1768_PWM_detach_pin(pin_t pin) {
   pin = GET_PIN_MAP_PIN(GET_PIN_MAP_INDEX(pin & 0xFF));
 
 ////  direct control PWM code
-  switch(pin) {
+  switch (pin) {
     case P1_23:                                       // MKS Sbase Servo 0, PWM1 channel 4  (J3-8 PWM1.4)
       if (!direct_table[P1_23_PWM_channel - 1].assigned) return false;
       CBI(LPC_PWM1->PCR, 8 + P1_23_PWM_channel);      // disable PWM1 module control of this pin
@@ -338,6 +347,11 @@ bool LPC1768_PWM_detach_pin(pin_t pin) {
 ////  interrupt controlled PWM code
   NVIC_DisableIRQ(HAL_PWM_TIMER_IRQn);
 
+  // We NEED memory barriers to ensure Interrupts are actually disabled!
+  // ( https://dzone.com/articles/nvic-disabling-interrupts-on-arm-cortex-m-and-the )
+  __DSB();
+  __ISB();
+
   if (ISR_table_update) {
     ISR_table_update = false;    // don't update yet - have another update to do
     NVIC_EnableIRQ(HAL_PWM_TIMER_IRQn);  // re-enable PWM interrupts
@@ -371,7 +385,7 @@ bool LPC1768_PWM_write(pin_t pin, uint32_t value) {
   pin = GET_PIN_MAP_PIN(GET_PIN_MAP_INDEX(pin & 0xFF));
 
 ////  direct control PWM code
-  switch(pin) {
+  switch (pin) {
     case P1_23:                                                           // MKS Sbase Servo 0, PWM1 channel 4  (J3-8 PWM1.4)
       if (!direct_table[P1_23_PWM_channel - 1].assigned) return false;
       LPC_PWM1->PCR |=  _BV(8 + P1_23_PWM_channel); // enable PWM1 module control of this pin
@@ -424,6 +438,12 @@ bool LPC1768_PWM_write(pin_t pin, uint32_t value) {
 
 ////  interrupt controlled PWM code
   NVIC_DisableIRQ(HAL_PWM_TIMER_IRQn);
+
+  // We NEED memory barriers to ensure Interrupts are actually disabled!
+  // ( https://dzone.com/articles/nvic-disabling-interrupts-on-arm-cortex-m-and-the )
+  __DSB();
+  __ISB();
+
   if (!ISR_table_update)   // use the most up to date table
     COPY_ACTIVE_TABLE;  // copy active table into work table
 
@@ -451,6 +471,11 @@ bool useable_hardware_PWM(pin_t pin) {
   pin = GET_PIN_MAP_PIN(GET_PIN_MAP_INDEX(pin & 0xFF));
 
   NVIC_DisableIRQ(HAL_PWM_TIMER_IRQn);
+
+  // We NEED memory barriers to ensure Interrupts are actually disabled!
+  // ( https://dzone.com/articles/nvic-disabling-interrupts-on-arm-cortex-m-and-the )
+  __DSB();
+  __ISB();
 
   bool return_flag = false;
   for (uint8_t i = 0; i < NUM_ISR_PWMS; i++)         // see if it's already setup
